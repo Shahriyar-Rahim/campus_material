@@ -127,7 +127,7 @@ export const multerUpload = multer({
   fileFilter: multerFilter,
   limits: {
     fileSize: MAX_FILE_SIZE_MB * 1024 * 1024,
-    files: 1,
+    files: 100,
   },
 });
 
