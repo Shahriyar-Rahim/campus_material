@@ -1,0 +1,102 @@
+import mongoose from "mongoose";
+
+const subjectFolderSchema = new mongoose.Schema(
+  {
+    courseCode: {
+      type: String,
+      required: [true, "Course code is required"],
+      uppercase: true,
+      trim: true,
+      // e.g. "CSE-1101", "EEE-1163"
+    },
+    courseName: {
+      type: String,
+      required: [true, "Course name is required"],
+      trim: true,
+      maxlength: 150,
+    },
+    courseDescription: {
+      type: String,
+      trim: true,
+      maxlength: 300,
+      default: "",
+    },
+
+    dept: {
+      type: String,
+      required: true,
+      uppercase: true,
+      trim: true,
+      index: true,
+    },
+    level: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 4,
+      index: true,
+    },
+    term: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 2,
+      index: true,
+    },
+    creditHours: {
+      type: Number,
+      default: 3,
+      min: 0,
+      max: 6,
+    },
+    courseType: {
+      type: String,
+      enum: ["Theory", "Lab", "Theory+Lab"],
+      default: "Theory",
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    creatorRole: {
+      type: String,
+      enum: ["CR", "Teacher", "Admin", "SuperAdmin"],
+      required: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+
+    materialCount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
+
+subjectFolderSchema.index(
+  { courseCode: 1, dept: 1, level: 1, term: 1 },
+  { unique: true }
+);
+
+subjectFolderSchema.index({ dept: 1, level: 1, term: 1, isActive: 1 });
+
+subjectFolderSchema.virtual("folderLabel").get(function () {
+  return `${this.dept} L${this.level}T${this.term} — ${this.courseCode}`;
+});
+
+const SubjectFolder = mongoose.model("SubjectFolder", subjectFolderSchema);
+export default SubjectFolder;
