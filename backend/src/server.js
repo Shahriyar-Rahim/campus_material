@@ -1,6 +1,6 @@
 import "dotenv/config";
-import app from "./app.js";
 import http from "http";
+import app from "./app.js";
 import connectDB from "./config/mongodb.config.js";
 import { initSocket } from "./config/socket.config.js";
 import supabase from "./config/supabase.js";

@@ -11,7 +11,6 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
-
 const baseQueryWithRateLimit = async (args, api, extraOptions) => {
   const result = await rawBaseQuery(args, api, extraOptions);
 
@@ -26,7 +25,9 @@ const baseQueryWithRateLimit = async (args, api, extraOptions) => {
         status: 429,
         data: {
           rateLimitInfo: {
-            message: body?.message || "Upload limit reached. Please wait before uploading again.",
+            message:
+              body?.message ||
+              "Upload limit reached. Please wait before uploading again.",
             retryAfterSeconds: body?.retryAfterSeconds ?? 60,
             resetAt: body?.resetAt ?? null,
             limit: body?.limit ?? 5,
@@ -46,7 +47,6 @@ export const materialsApi = createApi({
   baseQuery: baseQueryWithRateLimit,
   tagTypes: ["Material", "MaterialStats"],
   endpoints: (builder) => ({
-
     getMaterials: builder.query({
       query: ({ dept, level, term, category, courseCode, page = 1 }) => ({
         url: "/materials",
@@ -70,9 +70,12 @@ export const materialsApi = createApi({
         formData: true,
       }),
       invalidatesTags: (result, error, arg) => {
-        if (error?.status === 429) return []; 
+        if (error?.status === 429) return [];
         return [
-          { type: "Material", id: `${arg.get("dept")}-L${arg.get("level")}T${arg.get("term")}-${arg.get("category")}` },
+          {
+            type: "Material",
+            id: `${arg.get("dept")}-L${arg.get("level")}T${arg.get("term")}-${arg.get("category")}`,
+          },
           { type: "MaterialStats" },
         ];
       },
@@ -99,8 +102,9 @@ export const materialsApi = createApi({
 
     deleteMaterial: builder.mutation({
       query: ({ id, hard = false }) => ({
-        url: `/materials/${id}${hard ? "?hard=true" : ""}`,
+        url: `/materials/${id}`,
         method: "DELETE",
+        params: hard ? { hard: true } : {}, // Let RTK Query attach the query string safely
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: "Material", id },
@@ -134,7 +138,6 @@ export const {
   useUpdateMaterialMetaMutation,
   useGetMaterialStatsQuery,
 } = materialsApi;
-
 
 export const parseUploadError = (error) => {
   if (!error) return { isRateLimited: false, rateLimitInfo: null };

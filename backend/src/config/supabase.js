@@ -1,4 +1,6 @@
+import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
+import fetch from "node-fetch";
 
 // console.log("🔄 Initializing Supabase client...");
 // console.log("   SUPABASE_URL:", process.env.SUPABASE_URL ? "✅ found" : "❌ MISSING");
@@ -17,6 +19,9 @@ const supabase = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    global: {
+      fetch: fetch,
     },
   }
 );

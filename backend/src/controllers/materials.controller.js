@@ -33,7 +33,7 @@ export const getMaterials = catchAsync(async (req, res, next) => {
     isDeleted: false,
   };
   if (category) filter.category = category;
-  if (courseCode) filter.courseCode = courseCode.toUpperCase();
+  if (courseCode) filter.courseCode = decodeURIComponent(courseCode).toUpperCase();
 
   const skip = (Number(page) - 1) * Number(limit);
 

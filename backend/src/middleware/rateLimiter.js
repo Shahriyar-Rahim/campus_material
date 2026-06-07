@@ -1,6 +1,5 @@
 import rateLimit from "express-rate-limit";
 import multer from "multer";
-import { createClient } from "@supabase/supabase-js";
 import supabase from "../config/supabase.js";
 
 const rateLimitHandler = (req, res) => {
