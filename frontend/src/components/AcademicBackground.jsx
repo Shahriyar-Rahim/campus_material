@@ -8,6 +8,11 @@ const ACADEMIC_ASSETS = [
   { text: 'Concrete Mix: 1:1.5:3', color: 'rgba(226, 232, 240, 0.55)' },     // Aggregate Core Ratio
   { text: 'Shear Force Matrix V(x)', color: 'rgba(251, 146, 60, 0.6)' },
   { text: 'Bearing Capacity q_ult', color: 'rgba(217, 119, 6, 0.65)' },
+  
+  // Bangla poets quote, kazi nazrul, robi thakur, modhusudon datt
+  { text: 'কেন খুঁজে ফের দেবতা-ঠাকুর মৃত-পুঁথি-কঙ্কালে?', color: 'rgba(251, 146, 60, 0.6)' },
+  { text: 'অভ্যাস বদলেছে কিছু। সময়ও বদলেছে ঘড়ি।', color: 'rgba(251, 146, 60, 0.6)' },
+  { text: 'যক্ষ-প্রিয়ার চিঠি দিতে নিতে মেঘ; কখন হয়েছে ঘন তার প্রেমাবেগ।', color: 'rgba(251, 146, 60, 0.6)' },
 
   // ── BUSINESS ADMINISTRATION (BBA) ──
   { text: 'Assets = Liabilities + Equity', color: 'rgba(34, 211, 238, 0.65)' }, // Balance Sheet (Cyan)
