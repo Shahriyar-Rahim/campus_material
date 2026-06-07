@@ -778,7 +778,8 @@ export default function FolderView({
                 </span>
               </p>
               <p className="text-xs">
-                Documents, Code, Media, Archives · max 20 MB
+                Documents, Code, Media, Archives · max 20 MB <br />
+                Large files need to be compressed first.
               </p>
             </div>
           )}
