@@ -103,7 +103,7 @@ const ALLOWED_MIME_TYPES = [
   "application/x-7z-compressed"
 ];
 
-const MAX_FILE_SIZE_MB = 20;
+const MAX_FILE_SIZE_MB = 200;
 
 const multerStorage = multer.memoryStorage();
 

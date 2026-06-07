@@ -14,7 +14,6 @@ import FolderView from "../../components/FolderView.jsx";
 import { cn } from "../../utils/cn";
 import toast from "react-hot-toast";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const DEPTS  = ["CSE", "EEE", "ME", "CE", "TE", "BBA", "ENG"];
 const LEVELS = [1, 2, 3, 4];
 const TERMS  = [1, 2];
