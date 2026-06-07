@@ -14,9 +14,9 @@ import { useSocket } from "../utils/useSocket";
 import { cn } from "../utils/cn";
 
 const ROLES = {
-  canUpload:  ["CR", "Teacher", "Admin", "SuperAdmin"],
-  canPin:     ["CR", "Teacher", "Admin", "SuperAdmin"],
-  canDelete:  ["CR", "Teacher", "Admin", "SuperAdmin"],
+  canUpload: ["CR", "Teacher", "Admin", "SuperAdmin"],
+  canPin: ["CR", "Teacher", "Admin", "SuperAdmin"],
+  canDelete: ["CR", "Teacher", "Admin", "SuperAdmin"],
   canForward: ["Admin", "SuperAdmin"],
 };
 const can = (role, action) => ROLES[action]?.includes(role) ?? false;
@@ -62,7 +62,7 @@ function ForwardModal({ material, onClose, onForward }) {
 
   const updateTarget = (i, field, value) =>
     setTargets((t) =>
-      t.map((item, idx) => (idx === i ? { ...item, [field]: value } : item))
+      t.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)),
     );
 
   const removeTarget = (i) =>
@@ -172,7 +172,15 @@ function ForwardModal({ material, onClose, onForward }) {
   );
 }
 
-function FileRow({ material, userRole, userId, onPin, onUnpin, onDelete, onForward }) {
+function FileRow({
+  material,
+  userRole,
+  userId,
+  onPin,
+  onUnpin,
+  onDelete,
+  onForward,
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const ext = material.fileName?.split(".").pop()?.toUpperCase() || "FILE";
@@ -181,30 +189,30 @@ function FileRow({ material, userRole, userId, onPin, onUnpin, onDelete, onForwa
     : "";
 
   const extColors = {
-    PDF:  "bg-red-100 text-red-700",
+    PDF: "bg-red-100 text-red-700",
     DOCX: "bg-blue-100 text-blue-700",
-    DOC:  "bg-blue-100 text-blue-700",
+    DOC: "bg-blue-100 text-blue-700",
     PPTX: "bg-orange-100 text-orange-700",
-    PPT:  "bg-orange-100 text-orange-700",
-    PNG:  "bg-purple-100 text-purple-700",
-    JPG:  "bg-purple-100 text-purple-700",
+    PPT: "bg-orange-100 text-orange-700",
+    PNG: "bg-purple-100 text-purple-700",
+    JPG: "bg-purple-100 text-purple-700",
     JPEG: "bg-purple-100 text-purple-700",
-    C:    "bg-gray-800 text-white",
-    CPP:  "bg-blue-800 text-white",
-    PY:   "bg-yellow-100 text-yellow-700",
-    MP4:  "bg-indigo-100 text-indigo-700",
-    ZIP:  "bg-amber-100 text-amber-700",
+    C: "bg-gray-800 text-white",
+    CPP: "bg-blue-800 text-white",
+    PY: "bg-yellow-100 text-yellow-700",
+    MP4: "bg-indigo-100 text-indigo-700",
+    ZIP: "bg-amber-100 text-amber-700",
   };
 
   // Fine-grained permission checks per row
   const userCanPin = can(userRole, "canPin");
   const userCanForward = can(userRole, "canForward");
   // CRs can only delete their own uploads
-  const userCanDelete = 
-  userRole === "SuperAdmin" || 
-  userRole === "Admin" || 
-  userRole === "Teacher" || 
-  (userRole === "CR" && material.uploadedBy?._id?.toString() === userId);
+  const userCanDelete =
+    userRole === "SuperAdmin" ||
+    userRole === "Admin" ||
+    userRole === "Teacher" ||
+    (userRole === "CR" && material.uploadedBy?._id?.toString() === userId);
 
   const showMoreMenu = userCanPin || userCanDelete || userCanForward;
 
@@ -212,7 +220,7 @@ function FileRow({ material, userRole, userId, onPin, onUnpin, onDelete, onForwa
     <li
       className={cn(
         "group relative flex items-center gap-3 border-b border-gray-100 px-4 py-3 transition-colors hover:bg-gray-50",
-        material.isPinned && "bg-amber-50/60 hover:bg-amber-50"
+        material.isPinned && "bg-amber-50/60 hover:bg-amber-50",
       )}
     >
       {/* Pinned strip */}
@@ -224,7 +232,7 @@ function FileRow({ material, userRole, userId, onPin, onUnpin, onDelete, onForwa
       <span
         className={cn(
           "flex h-8 w-12 shrink-0 items-center justify-center rounded text-xs font-bold",
-          extColors[ext] || "bg-gray-100 text-gray-600"
+          extColors[ext] || "bg-gray-100 text-gray-600",
         )}
       >
         {ext}
@@ -278,7 +286,6 @@ function FileRow({ material, userRole, userId, onPin, onUnpin, onDelete, onForwa
       </span>
 
       <div className="flex shrink-0 items-center gap-1">
-
         {/* VIEW — everyone */}
         <a
           href={material.supabaseUrl}
@@ -450,24 +457,26 @@ function PresenceStrip({ courseCode }) {
           </span>
         )}
       </div>
-      <span className="ml-auto text-xs text-green-600">Tap avatar to nudge</span>
+      <span className="ml-auto text-xs text-green-600">
+        Tap avatar to nudge
+      </span>
     </div>
   );
 }
 
 const ROLE_HINTS = {
-  Student:    "You can view and download files",
-  CR:         "You can upload, pin, and delete your own files",
-  Teacher:    "You can upload, pin, and delete files",
-  Admin:      "You can upload, pin, delete, and forward files",
+  Student: "You can view and download files",
+  CR: "You can upload, pin, and delete your own files",
+  Teacher: "You can upload, pin, and delete files",
+  Admin: "You can upload, pin, delete, and forward files",
   SuperAdmin: "You can upload, pin, delete, and forward files",
 };
 
 const ROLE_PILL = {
-  Student:    "bg-gray-100 text-gray-600",
-  CR:         "bg-blue-100 text-blue-700",
-  Teacher:    "bg-purple-100 text-purple-700",
-  Admin:      "bg-amber-100 text-amber-700",
+  Student: "bg-gray-100 text-gray-600",
+  CR: "bg-blue-100 text-blue-700",
+  Teacher: "bg-purple-100 text-purple-700",
+  Admin: "bg-amber-100 text-amber-700",
   SuperAdmin: "bg-red-100 text-red-700",
 };
 
@@ -479,33 +488,35 @@ export default function FolderView({
   level,
   term,
 }) {
-  const currentUser  = useSelector(selectCurrentUser);
+  const currentUser = useSelector(selectCurrentUser);
   const fileInputRef = useRef(null);
-  const dropZoneRef  = useRef(null);
+  const dropZoneRef = useRef(null);
 
-  const [isDragOver, setIsDragOver]       = useState(false);
-  const [selectedFile, setSelectedFile]   = useState(null);
-  const [uploadForm, setUploadForm]       = useState({ title: "", description: "" });
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadForm, setUploadForm] = useState({ title: "", description: "" });
   const [forwardTarget, setForwardTarget] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentSubfolderPath, setCurrentSubfolderPath] = useState([]);
 
   const userRole = currentUser?.role;
-  const userId   = currentUser?._id?.toString();
+  const userId = currentUser?._id?.toString();
   const userCanUpload = can(userRole, "canUpload");
 
   // RTK Query
   const { data, isLoading, isError, refetch } = useGetMaterialsQuery(
     { dept, level, term, category, courseCode },
-    { skip: !dept || !level || !term }
+    { skip: !dept || !level || !term },
   );
 
   const [uploadMaterial, uploadResult] = useUploadMaterialMutation();
-  const [pinMaterial]                  = usePinMaterialMutation();
-  const [unpinMaterial]                = useUnpinMaterialMutation();
-  const [deleteMaterial]               = useDeleteMaterialMutation();
-  const [forwardMaterial]              = useForwardMaterialMutation();
+  const [pinMaterial] = usePinMaterialMutation();
+  const [unpinMaterial] = useUnpinMaterialMutation();
+  const [deleteMaterial] = useDeleteMaterialMutation();
+  const [forwardMaterial] = useForwardMaterialMutation();
 
   const { isRateLimited, rateLimitInfo, errorMessage } = parseUploadError(
-    uploadResult.error
+    uploadResult.error,
   );
 
   // File selection
@@ -514,10 +525,13 @@ export default function FolderView({
       if (!file) return;
       setSelectedFile(file);
       if (!uploadForm.title) {
-        setUploadForm((f) => ({ ...f, title: file.name.replace(/\.[^.]+$/, "") }));
+        setUploadForm((f) => ({
+          ...f,
+          title: file.name.replace(/\.[^.]+$/, ""),
+        }));
       }
     },
-    [uploadForm.title]
+    [uploadForm.title],
   );
 
   const handleDrop = (e) => {
@@ -561,13 +575,11 @@ export default function FolderView({
   const handleForward = (materialId, targets) => {
     forwardMaterial({ id: materialId, targets });
   };
-
   const materials = data?.data || [];
-  const total     = data?.total || 0;
+  const total = data?.total || 0;
 
   return (
     <div className="flex flex-col gap-4">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -578,6 +590,7 @@ export default function FolderView({
             {total} file{total !== 1 ? "s" : ""}
           </p>
         </div>
+        
         {userCanUpload && (
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -586,7 +599,7 @@ export default function FolderView({
               "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
               isRateLimited
                 ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+                : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800",
             )}
           >
             ↑ Upload File
@@ -596,7 +609,12 @@ export default function FolderView({
 
       {/* Role hint pill */}
       <div className="flex items-center gap-2 text-xs text-gray-400">
-        <span className={cn("rounded-full px-2 py-0.5 font-medium", ROLE_PILL[userRole])}>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 font-medium",
+            ROLE_PILL[userRole],
+          )}
+        >
           {userRole}
         </span>
         <span>{ROLE_HINTS[userRole]}</span>
@@ -641,16 +659,21 @@ export default function FolderView({
       {userCanUpload && (
         <div
           ref={dropZoneRef}
-          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
           onClick={() => !selectedFile && fileInputRef.current?.click()}
           className={cn(
             "rounded-xl border-2 border-dashed transition-colors",
-            isDragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50",
+            isDragOver
+              ? "border-blue-400 bg-blue-50"
+              : "border-gray-200 bg-gray-50",
             selectedFile
               ? "p-4"
-              : "cursor-pointer p-6 text-center hover:border-blue-300 hover:bg-blue-50/40"
+              : "cursor-pointer p-6 text-center hover:border-blue-300 hover:bg-blue-50/40",
           )}
         >
           {selectedFile ? (
@@ -669,7 +692,10 @@ export default function FolderView({
                 <span className="text-xs text-gray-400">
                   {(selectedFile.size / 1024).toFixed(0)} KB
                 </span>
-                <button onClick={clearFile} className="text-gray-400 hover:text-gray-600">
+                <button
+                  onClick={clearFile}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   ✕
                 </button>
               </div>
@@ -697,19 +723,36 @@ export default function FolderView({
               <div className="flex gap-2">
                 <button
                   onClick={handleUpload}
-                  disabled={!uploadForm.title || uploadResult.isLoading || isRateLimited}
+                  disabled={
+                    !uploadForm.title || uploadResult.isLoading || isRateLimited
+                  }
                   className={cn(
                     "flex-1 rounded-lg py-2 text-sm font-medium transition-colors",
                     !uploadForm.title || uploadResult.isLoading
                       ? "cursor-not-allowed bg-gray-200 text-gray-400"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-blue-600 text-white hover:bg-blue-700",
                   )}
                 >
                   {uploadResult.isLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      <svg
+                        className="h-4 w-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8z"
+                        />
                       </svg>
                       Uploading…
                     </span>
@@ -730,9 +773,13 @@ export default function FolderView({
               <span className="text-2xl">📎</span>
               <p className="text-sm font-medium text-gray-600">
                 Drag & drop a file here, or{" "}
-                <span className="text-blue-600 underline">browse local storage</span>
+                <span className="text-blue-600 underline">
+                  browse local storage
+                </span>
               </p>
-              <p className="text-xs">Documents, Code, Media, Archives · max 20 MB</p>
+              <p className="text-xs">
+                Documents, Code, Media, Archives · max 20 MB
+              </p>
             </div>
           )}
         </div>
@@ -743,7 +790,10 @@ export default function FolderView({
         {isLoading ? (
           <div className="space-y-1 p-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100" />
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-lg bg-gray-100"
+              />
             ))}
           </div>
         ) : isError ? (

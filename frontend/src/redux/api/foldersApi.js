@@ -22,7 +22,6 @@ export const foldersApi = createApi({
   baseQuery: baseQueryWithLogout,
   tagTypes: ["Folder"],
   endpoints: (builder) => ({
-
     // List folders for a specific level/term section
     getFolders: builder.query({
       query: ({ dept, level, term }) => ({
@@ -41,7 +40,9 @@ export const foldersApi = createApi({
     // All folders for a dept (for the filter panel — all levels/terms)
     getAllFoldersByDept: builder.query({
       query: (dept) => ({ url: "/folders/all", params: { dept } }),
-      providesTags: (result, error, dept) => [{ type: "Folder", id: `dept-${dept}` }],
+      providesTags: (result, error, dept) => [
+        { type: "Folder", id: `dept-${dept}` },
+      ],
     }),
 
     // Single folder
@@ -61,8 +62,34 @@ export const foldersApi = createApi({
 
     // Update folder
     updateFolder: builder.mutation({
-      query: ({ id, ...body }) => ({ url: `/folders/${id}`, method: "PATCH", body }),
+      query: ({ id, ...body }) => ({
+        url: `/folders/${id}`,
+        method: "PATCH",
+        body,
+      }),
       invalidatesTags: (result, error, { id }) => [{ type: "Folder", id }],
+    }),
+
+    getFolderChildren: builder.query({
+      query: (id) => `/folders/${id}/children`,
+      providesTags: (result, error, id) => [
+        { type: "Folder", id: `children-${id}` },
+      ],
+    }),
+
+    getFolderBreadcrumb: builder.query({
+      query: (id) => `/folders/${id}/breadcrumb`,
+    }),
+
+    createSubFolder: builder.mutation({
+      query: ({ parentId, ...body }) => ({
+        url: `/folders/${parentId}/subfolder`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (result, error, { parentId }) => [
+        { type: "Folder", id: `children-${parentId}` },
+      ],
     }),
 
     // Delete folder
@@ -80,7 +107,10 @@ export const {
   useGetFoldersQuery,
   useGetAllFoldersByDeptQuery,
   useGetFolderByIdQuery,
+  useGetFolderChildrenQuery,
+  useGetFolderBreadcrumbQuery,
   useCreateFolderMutation,
+  useCreateSubFolderMutation,
   useUpdateFolderMutation,
   useDeleteFolderMutation,
 } = foldersApi;

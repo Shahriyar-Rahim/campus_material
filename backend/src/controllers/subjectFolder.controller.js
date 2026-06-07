@@ -191,3 +191,105 @@ export const getFolderById = catchAsync(async (req, res, next) => {
 
   res.status(200).json({ success: true, data: folder });
 });
+
+// ── GET /api/folders/:id/children — get direct children of a folder
+export const getFolderChildren = catchAsync(async (req, res, next) => {
+  const children = await SubjectFolder.find({
+    parentFolder: req.params.id,
+    isActive: true,
+  })
+    .populate("createdBy", "name role")
+    .sort({ isPinned: -1, courseName: 1 })
+    .lean();
+
+  // Attach material counts for each child
+  const counts = await Material.aggregate([
+    {
+      $match: {
+        isDeleted: false,
+        courseCode: { $in: children.map((c) => c.courseCode) },
+        dept: children[0]?.dept,
+        level: children[0]?.level,
+        term: children[0]?.term,
+      },
+    },
+    { $group: { _id: "$courseCode", count: { $sum: 1 } } },
+  ]);
+
+  const countMap = {};
+  counts.forEach((c) => { countMap[c._id] = c.count; });
+
+  res.status(200).json({
+    success: true,
+    data: children.map((c) => ({
+      ...c,
+      materialCount: countMap[c.courseCode] || 0,
+    })),
+  });
+});
+
+// ── POST /api/folders/:id/subfolder — create a subfolder inside a folder
+export const createSubFolder = catchAsync(async (req, res, next) => {
+  if (!MANAGER_ROLES.includes(req.user.role)) {
+    return next(new AppError("Permission denied.", 403));
+  }
+
+  const parentFolder = await SubjectFolder.findById(req.params.id);
+  if (!parentFolder) return next(new AppError("Parent folder not found.", 404));
+
+  if (parentFolder.depth >= 3) {
+    return next(new AppError("Maximum folder depth (3) reached.", 400));
+  }
+
+  const { folderName, description } = req.body;
+  if (!folderName) return next(new AppError("folderName is required.", 400));
+
+  // Subfolders use a generated courseCode to satisfy the unique index
+  const subCode = `${parentFolder.courseCode}-${folderName.toUpperCase().replace(/\s+/g, "-").slice(0, 10)}`;
+  const newPath = parentFolder.parentPath
+    ? `${parentFolder.parentPath}/${folderName}`
+    : `${parentFolder.courseCode}/${folderName}`;
+
+  const subfolder = await SubjectFolder.create({
+    courseCode:    subCode,
+    courseName:    folderName,
+    courseDescription: description || "",
+    dept:          parentFolder.dept,
+    level:         parentFolder.level,
+    term:          parentFolder.term,
+    creditHours:   0,
+    courseType:    parentFolder.courseType,
+    createdBy:     req.user._id,
+    creatorRole:   req.user.role,
+    parentFolder:  parentFolder._id,
+    parentPath:    newPath,
+    isRootFolder:  false,
+    depth:         parentFolder.depth + 1,
+  });
+
+  await subfolder.populate("createdBy", "name role");
+
+  res.status(201).json({
+    success: true,
+    message: "Subfolder created.",
+    data: subfolder,
+  });
+});
+
+// ── GET /api/folders/:id/breadcrumb — full path from root to this folder
+export const getFolderBreadcrumb = catchAsync(async (req, res, next) => {
+  const breadcrumb = [];
+  let current = await SubjectFolder.findById(req.params.id).lean();
+
+  if (!current) return next(new AppError("Folder not found.", 404));
+
+  breadcrumb.unshift(current);
+
+  while (current.parentFolder) {
+    current = await SubjectFolder.findById(current.parentFolder).lean();
+    if (!current) break;
+    breadcrumb.unshift(current);
+  }
+
+  res.status(200).json({ success: true, data: breadcrumb });
+});

@@ -79,16 +79,35 @@ const subjectFolderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    parentPath: {
+      type: String, // e.g., "CSE-1101/Mid"
+      default: null,
+      index: true,
+    },
+    parentFolder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubjectFolder",
+      default: null, // null = root level folder (the course folder)
+    },
+    isRootFolder: {
+      type: Boolean,
+      default: true, // false for subfolders
+    },
+    depth: {
+      type: Number,
+      default: 0, // 0=course, 1=subfolder, 2=nested subfolder
+      max: 3, // max 3 levels deep
+    },
   },
   {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 subjectFolderSchema.index(
-  { courseCode: 1, dept: 1, level: 1, term: 1 },
+  { courseCode: 1, dept: 1, level: 1, term: 1, parentFolder: 1 },
   { unique: true }
 );
 

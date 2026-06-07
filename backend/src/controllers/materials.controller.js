@@ -1,5 +1,6 @@
 import Material from "../models/Material.model.js";
 import User from "../models/user.model.js";
+import SubjectFolder from "../models/SubjectFolder.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import { uploadToSupabase } from "../middleware/rateLimiter.js";
@@ -253,7 +254,7 @@ export const forwardMaterial = catchAsync(async (req, res, next) => {
 });
 
 export const deleteMaterial = catchAsync(async (req, res, next) => {
-  if (!can(req.user.role, "canDelete")) {
+  if (!canManage(req.user.role)) {
   return next(
     new AppError("You do not have permission to delete materials.", 403),
   );
@@ -339,5 +340,77 @@ export const getMaterialStats = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     data: { totalFiles, byCategory, recentUploads },
+  });
+});
+
+export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
+  if (!req.files || req.files.length === 0) {
+    return next(new AppError("No files selected.", 400));
+  }
+
+  const { dept, level, term, courseCode, category, folderId } = req.body;
+
+  if (!dept || !level || !term || !courseCode || !category) {
+    return next(new AppError("dept, level, term, courseCode, category are required.", 400));
+  }
+
+  // If folderId provided, get the subfolder path
+  let basePath = `${dept.toLowerCase()}/l${level}t${term}/${courseCode.toLowerCase()}/${category.toLowerCase()}`;
+  
+  if (folderId) {
+    const folder = await SubjectFolder.findById(folderId).lean();
+    if (folder?.parentPath) {
+      basePath = `${dept.toLowerCase()}/l${level}t${term}/${folder.parentPath.toLowerCase()}`;
+    }
+  }
+
+  // Upload all files in parallel
+  const results = await Promise.allSettled(
+    req.files.map(async (file) => {
+      const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const fullPath = `${basePath}/${Date.now()}_${safeFilename}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(process.env.SUPABASE_BUCKET || "materials")
+        .upload(fullPath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(`${file.originalname}: ${uploadError.message}`);
+
+      const { data: urlData } = supabase.storage
+        .from(process.env.SUPABASE_BUCKET || "materials")
+        .getPublicUrl(fullPath);
+
+      return Material.create({
+        title:         file.originalname.replace(/\.[^.]+$/, ""), // strip extension
+        fileName:      file.originalname,
+        supabaseUrl:   urlData.publicUrl,
+        supabasePath:  fullPath,
+        supabaseBucket: process.env.SUPABASE_BUCKET || "materials",
+        category,
+        courseCode:    courseCode.toUpperCase(),
+        dept:          dept.toUpperCase(),
+        level:         Number(level),
+        term:          Number(term),
+        mimeType:      file.mimetype,
+        fileSize:      file.size,
+        uploadedBy:    req.user._id,
+        uploaderRole:  req.user.role,
+      });
+    })
+  );
+
+  const succeeded = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  const failed    = results.filter((r) => r.status === "rejected") .map((r) => r.reason?.message);
+
+  res.status(201).json({
+    success: true,
+    message: `${succeeded.length} file(s) uploaded${failed.length ? `, ${failed.length} failed` : ""}.`,
+    uploaded: succeeded.length,
+    failed:   failed.length,
+    errors:   failed,
+    data:     succeeded,
   });
 });
