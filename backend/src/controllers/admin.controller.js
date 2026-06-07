@@ -1,4 +1,4 @@
-import User from "../models/User.model.js";
+import User from "../models/user.model.js";
 import Material from "../models/Material.model.js";
 import { Planner } from "../models/Planner.model.js";
 import catchAsync from "../utils/catchAsync.js";

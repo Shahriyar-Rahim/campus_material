@@ -1,5 +1,5 @@
 import Material from "../models/Material.model.js";
-import User from "../models/User.model.js";
+import User from "../models/user.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import { uploadToSupabase } from "../middleware/rateLimiter.js";
