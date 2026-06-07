@@ -5,6 +5,7 @@ import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import { uploadToSupabase } from "../middleware/rateLimiter.js";
 import supabase from "../config/supabase.js";
+import { v4 as uuidv4 } from "uuid";
 
 const MANAGER_ROLES = ["CR", "Teacher", "Admin", "SuperAdmin"];
 const canManage = (role) => MANAGER_ROLES.includes(role);
@@ -34,7 +35,8 @@ export const getMaterials = catchAsync(async (req, res, next) => {
     isDeleted: false,
   };
   if (category) filter.category = category;
-  if (courseCode) filter.courseCode = decodeURIComponent(courseCode).toUpperCase();
+  if (courseCode)
+    filter.courseCode = decodeURIComponent(courseCode).toUpperCase();
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -133,16 +135,16 @@ export const pinMaterial = catchAsync(async (req, res, next) => {
   const material = await Material.findById(req.params.id);
   if (!material) return next(new AppError("Material not found.", 404));
 
-  
-
   if (req.user.role === "CR") {
-    const isSameSection = 
-      material.dept === req.user.dept && 
-      Number(material.level) === Number(req.user.level) && 
+    const isSameSection =
+      material.dept === req.user.dept &&
+      Number(material.level) === Number(req.user.level) &&
       Number(material.term) === Number(req.user.term);
 
     if (!isSameSection) {
-      return next(new AppError("CRs can only pin materials for their own section.", 403));
+      return next(
+        new AppError("CRs can only pin materials for their own section.", 403),
+      );
     }
   }
 
@@ -202,12 +204,10 @@ export const forwardMaterial = catchAsync(async (req, res, next) => {
   });
 
   if (newForwards.length === 0) {
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "All targets already received this material.",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "All targets already received this material.",
+    });
   }
 
   const forwardedDocs = newForwards.map((t) => ({
@@ -255,25 +255,31 @@ export const forwardMaterial = catchAsync(async (req, res, next) => {
 
 export const deleteMaterial = catchAsync(async (req, res, next) => {
   if (!canManage(req.user.role)) {
-  return next(
-    new AppError("You do not have permission to delete materials.", 403),
-  );
-}
+    return next(
+      new AppError("You do not have permission to delete materials.", 403),
+    );
+  }
 
   const material = await Material.findById(req.params.id);
   if (!material) return next(new AppError("Material not found.", 404));
 
-  if (req.user.role === "CR" && material.uploadedBy.toString() !== req.user._id.toString()) {
-  return next(new AppError("CRs can only delete their own uploads.", 403));
-}
-// Teachers restricted to their own dept's materials
-if (req.user.role === "Teacher" &&
-    material.dept !== req.user.dept) {
-  return next(new AppError("Teachers can only delete materials in their own department.", 403));
-}
+  if (
+    req.user.role === "CR" &&
+    material.uploadedBy.toString() !== req.user._id.toString()
+  ) {
+    return next(new AppError("CRs can only delete their own uploads.", 403));
+  }
+  // Teachers restricted to their own dept's materials
+  if (req.user.role === "Teacher" && material.dept !== req.user.dept) {
+    return next(
+      new AppError(
+        "Teachers can only delete materials in their own department.",
+        403,
+      ),
+    );
+  }
 
   if (req.user.role === "SuperAdmin" && req.query.hard === "true") {
-    
     await supabase.storage
       .from(material.supabaseBucket)
       .remove([material.supabasePath]);
@@ -351,12 +357,17 @@ export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
   const { dept, level, term, courseCode, category, folderId } = req.body;
 
   if (!dept || !level || !term || !courseCode || !category) {
-    return next(new AppError("dept, level, term, courseCode, category are required.", 400));
+    return next(
+      new AppError(
+        "dept, level, term, courseCode, category are required.",
+        400,
+      ),
+    );
   }
 
   // If folderId provided, get the subfolder path
   let basePath = `${dept.toLowerCase()}/l${level}t${term}/${courseCode.toLowerCase()}/${category.toLowerCase()}`;
-  
+
   if (folderId) {
     const folder = await SubjectFolder.findById(folderId).lean();
     if (folder?.parentPath) {
@@ -367,8 +378,24 @@ export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
   // Upload all files in parallel
   const results = await Promise.allSettled(
     req.files.map(async (file) => {
-      const safeFilename = file.originalname.replace(/[^\p{L}\p{N}.\-_]/gu, "_");
-      const fullPath = `${basePath}/${Date.now()}_${safeFilename}`;
+      const timestamp = Date.now();
+
+      // 1. Fix the Multer Encoding (Convert broken Latin1 back to perfect Bangla UTF-8)
+      const cleanBanglaName = Buffer.from(file.originalname, "latin1").toString(
+        "utf8",
+      );
+
+      // 2. Extract the file extension safely (e.g., "pdf", "docx")
+      const fileExtension = file.originalname.split(".").pop();
+
+      // 3. Create a unique, safe filename for Supabase (e.g., "17808568_a1b2c3d4.pdf")
+      const secureStorageName = `${timestamp}_${uuidv4()}.${fileExtension}`;
+
+      const safeFilename = file.originalname.replace(
+        /[^\p{L}\p{N}.\-_]/gu,
+        "_",
+      );
+      const fullPath = `${basePath}/${Date.now()}_${secureStorageName}`;
 
       const { error: uploadError } = await supabase.storage
         .from(process.env.SUPABASE_BUCKET || "materials")
@@ -377,40 +404,45 @@ export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
           upsert: false,
         });
 
-      if (uploadError) throw new Error(`${file.originalname}: ${uploadError.message}`);
+      if (uploadError)
+        throw new Error(`${file.originalname}: ${uploadError.message}`);
 
       const { data: urlData } = supabase.storage
         .from(process.env.SUPABASE_BUCKET || "materials")
         .getPublicUrl(fullPath);
 
       return Material.create({
-        title:         file.originalname.replace(/\.[^.]+$/, ""), // strip extension
-        fileName:      file.originalname,
-        supabaseUrl:   urlData.publicUrl,
-        supabasePath:  fullPath,
+        title: fcleanBanglaName, // strip extension
+        fileName: cleanBanglaName,
+        supabaseUrl: urlData.publicUrl,
+        supabasePath: fullPath,
         supabaseBucket: process.env.SUPABASE_BUCKET || "materials",
         category,
-        courseCode:    courseCode.toUpperCase(),
-        dept:          dept.toUpperCase(),
-        level:         Number(level),
-        term:          Number(term),
-        mimeType:      file.mimetype,
-        fileSize:      file.size,
-        uploadedBy:    req.user._id,
-        uploaderRole:  req.user.role,
+        courseCode: courseCode.toUpperCase(),
+        dept: dept.toUpperCase(),
+        level: Number(level),
+        term: Number(term),
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        uploadedBy: req.user._id,
+        uploaderRole: req.user.role,
       });
-    })
+    }),
   );
 
-  const succeeded = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
-  const failed    = results.filter((r) => r.status === "rejected") .map((r) => r.reason?.message);
+  const succeeded = results
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => r.value);
+  const failed = results
+    .filter((r) => r.status === "rejected")
+    .map((r) => r.reason?.message);
 
   res.status(201).json({
     success: true,
     message: `${succeeded.length} file(s) uploaded${failed.length ? `, ${failed.length} failed` : ""}.`,
     uploaded: succeeded.length,
-    failed:   failed.length,
-    errors:   failed,
-    data:     succeeded,
+    failed: failed.length,
+    errors: failed,
+    data: succeeded,
   });
 });
