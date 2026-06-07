@@ -33,19 +33,59 @@ import FolderView from "../../components/FolderView.jsx";
 import { cn } from "../../utils/cn";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const DEPTS  = ["CSE", "EEE", "ME", "CE", "TE", "BBA", "ENG"];
+const DEPTS = ["CSE", "EEE", "ME", "CE", "TE", "BBA", "ENG"];
 const LEVELS = [1, 2, 3, 4];
-const TERMS  = [1, 2];
+const TERMS = [1, 2];
 
 const CATEGORY_CONFIG = [
-  { category: "Notice",     icon: "📢", color: "bg-red-50    border-red-200    text-red-700",    desc: "Announcements" },
-  { category: "Mid",        icon: "📝", color: "bg-blue-50   border-blue-200   text-blue-700",   desc: "Midterm papers" },
-  { category: "Final",      icon: "📋", color: "bg-purple-50 border-purple-200 text-purple-700", desc: "Final papers"   },
-  { category: "RIB",        icon: "📌", color: "bg-amber-50  border-amber-200  text-amber-700",  desc: "Results & bulletins" },
-  { category: "Lab",        icon: "🧪", color: "bg-green-50  border-green-200  text-green-700",  desc: "Lab reports"    },
-  { category: "Slides",     icon: "🖥️",  color: "bg-cyan-50   border-cyan-200   text-cyan-700",   desc: "Lecture slides" },
-  { category: "Assignment", icon: "✏️",  color: "bg-pink-50   border-pink-200   text-pink-700",   desc: "Assignments"    },
-  { category: "Other",      icon: "📎", color: "bg-gray-50   border-gray-200   text-gray-700",   desc: "Other files"    },
+  {
+    category: "Notice",
+    icon: "📢",
+    color: "bg-red-50    border-red-200    text-red-700",
+    desc: "Announcements",
+  },
+  {
+    category: "Mid",
+    icon: "📝",
+    color: "bg-blue-50   border-blue-200   text-blue-700",
+    desc: "Midterm papers",
+  },
+  {
+    category: "Final",
+    icon: "📋",
+    color: "bg-purple-50 border-purple-200 text-purple-700",
+    desc: "Final papers",
+  },
+  {
+    category: "RIB",
+    icon: "📌",
+    color: "bg-amber-50  border-amber-200  text-amber-700",
+    desc: "Results & bulletins",
+  },
+  {
+    category: "Lab",
+    icon: "🧪",
+    color: "bg-green-50  border-green-200  text-green-700",
+    desc: "Lab reports",
+  },
+  {
+    category: "Slides",
+    icon: "🖥️",
+    color: "bg-cyan-50   border-cyan-200   text-cyan-700",
+    desc: "Lecture slides",
+  },
+  {
+    category: "Assignment",
+    icon: "✏️",
+    color: "bg-pink-50   border-pink-200   text-pink-700",
+    desc: "Assignments",
+  },
+  {
+    category: "Other",
+    icon: "📎",
+    color: "bg-gray-50   border-gray-200   text-gray-700",
+    desc: "Other files",
+  },
 ];
 
 const COURSE_TYPES = ["Theory", "Lab", "Theory+Lab"];
@@ -54,7 +94,14 @@ const MANAGER_ROLES = ["CR", "Teacher", "Admin", "SuperAdmin"];
 const canManage = (role) => MANAGER_ROLES.includes(role);
 
 // ── Create Folder Modal ───────────────────────────────────────────────────────
-function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) {
+function CreateFolderModal({
+  dept,
+  level,
+  term,
+  onClose,
+  onCreated,
+  userRole,
+}) {
   const [createFolder, { isLoading }] = useCreateFolderMutation();
   const [form, setForm] = useState({
     courseCode: "",
@@ -81,7 +128,7 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
       ...form,
       level: Number(form.level),
       term: Number(form.term),
-      creditHours: Number(form.creditHours),
+      creditHours: parseFloat(form.creditHours),
     });
     if (result.error) {
       setError(result.error.data?.message || "Failed to create folder.");
@@ -148,6 +195,7 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
               <input
                 name="creditHours"
                 type="number"
+                step="0.25" // Allows inputs like 0.75, 1.5, etc.
                 min="0"
                 max="6"
                 value={form.creditHours}
@@ -199,7 +247,9 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
                 required
               >
                 {DEPTS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
               </select>
             </div>
@@ -215,7 +265,9 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
                 className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500"
               >
                 {LEVELS.map((l) => (
-                  <option key={l} value={l}>L{l}</option>
+                  <option key={l} value={l}>
+                    L{l}
+                  </option>
                 ))}
               </select>
             </div>
@@ -231,7 +283,9 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
                 className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500"
               >
                 {TERMS.map((t) => (
-                  <option key={t} value={t}>T{t}</option>
+                  <option key={t} value={t}>
+                    T{t}
+                  </option>
                 ))}
               </select>
             </div>
@@ -252,7 +306,7 @@ function CreateFolderModal({ dept, level, term, onClose, onCreated, userRole }) 
                     "flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors",
                     form.courseType === ct
                       ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300",
                   )}
                 >
                   {ct}
@@ -298,7 +352,8 @@ function CategoryModal({ folder, onClose, onSelect }) {
           <div>
             <h2 className="font-semibold text-gray-900">{folder.courseName}</h2>
             <p className="text-xs text-gray-500">
-              {folder.courseCode} · {folder.creditHours} cr · {folder.courseType}
+              {folder.courseCode} · {folder.creditHours} cr ·{" "}
+              {folder.courseType}
             </p>
           </div>
           <button
@@ -308,7 +363,9 @@ function CategoryModal({ folder, onClose, onSelect }) {
             ✕
           </button>
         </div>
-        <p className="mb-3 text-xs text-gray-400">Select a category to browse:</p>
+        <p className="mb-3 text-xs text-gray-400">
+          Select a category to browse:
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {CATEGORY_CONFIG.map((c) => (
             <button
@@ -316,7 +373,7 @@ function CategoryModal({ folder, onClose, onSelect }) {
               onClick={() => onSelect(folder, c.category)}
               className={cn(
                 "flex items-center gap-2 rounded-xl border p-3 text-left transition-all hover:scale-[1.02] hover:shadow-sm",
-                c.color
+                c.color,
               )}
             >
               <span className="text-xl">{c.icon}</span>
@@ -343,7 +400,12 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete "${folder.courseName}"? This won't delete uploaded files.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${folder.courseName}"? This won't delete uploaded files.`,
+      )
+    )
+      return;
     await deleteFolder({ id: folder._id });
   };
 
@@ -353,9 +415,9 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
   };
 
   const TYPE_BADGE = {
-    Theory:      "bg-blue-100 text-blue-700",
-    Lab:         "bg-green-100 text-green-700",
-    "Theory+Lab":"bg-purple-100 text-purple-700",
+    Theory: "bg-blue-100 text-blue-700",
+    Lab: "bg-green-100 text-green-700",
+    "Theory+Lab": "bg-purple-100 text-purple-700",
   };
 
   return (
@@ -363,12 +425,14 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
       onClick={() => onOpen(folder)}
       className={cn(
         "card group relative cursor-pointer p-4 transition-all hover:-translate-y-0.5 hover:shadow-md",
-        folder.isPinned && "ring-2 ring-amber-300"
+        folder.isPinned && "ring-2 ring-amber-300",
       )}
     >
       {/* Pin ribbon */}
       {folder.isPinned && (
-        <span className="absolute right-3 top-3 text-base" title="Pinned">📌</span>
+        <span className="absolute right-3 top-3 text-base" title="Pinned">
+          📌
+        </span>
       )}
 
       {/* Header */}
@@ -388,7 +452,12 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
 
       {/* Meta */}
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className={cn("rounded-full px-2 py-0.5 font-medium", TYPE_BADGE[folder.courseType])}>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 font-medium",
+            TYPE_BADGE[folder.courseType],
+          )}
+        >
           {folder.courseType}
         </span>
         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
@@ -408,7 +477,7 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
             key={c.category}
             className={cn(
               "flex flex-col items-center rounded-lg border py-1 text-center",
-              c.color
+              c.color,
             )}
           >
             <span className="text-xs">{c.icon}</span>
@@ -464,7 +533,9 @@ function FilterPanel({ filter, onChange, userRole, userDept }) {
               className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-700 focus:border-blue-500 focus:outline-none"
             >
               {DEPTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
+                <option key={d} value={d}>
+                  {d}
+                </option>
               ))}
             </select>
           </div>
@@ -487,7 +558,7 @@ function FilterPanel({ filter, onChange, userRole, userDept }) {
                   <option key={`${l}-${t}`} value={`${l}-${t}`}>
                     L{l} — T{t}
                   </option>
-                ))
+                )),
               )}
             </select>
           </div>
@@ -514,12 +585,14 @@ function FilterPanel({ filter, onChange, userRole, userDept }) {
             {DEPTS.map((d) => (
               <button
                 key={d}
-                onClick={() => onChange({ dept: d, level: filter.level, term: filter.term })}
+                onClick={() =>
+                  onChange({ dept: d, level: filter.level, term: filter.term })
+                }
                 className={cn(
                   "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
                   filter.dept === d
                     ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700",
                 )}
               >
                 {d}
@@ -539,19 +612,23 @@ function FilterPanel({ filter, onChange, userRole, userDept }) {
                 return (
                   <button
                     key={`${l}-${t}`}
-                    onClick={() => onChange({ dept: filter.dept, level: l, term: t })}
+                    onClick={() =>
+                      onChange({ dept: filter.dept, level: l, term: t })
+                    }
                     className={cn(
                       "flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
                       isActive
                         ? "bg-blue-600 font-semibold text-white"
-                        : "text-gray-600 hover:bg-gray-50"
+                        : "text-gray-600 hover:bg-gray-50",
                     )}
                   >
-                    <span>Level {l} — Term {t}</span>
+                    <span>
+                      Level {l} — Term {t}
+                    </span>
                     {isActive && <span className="text-xs opacity-80">●</span>}
                   </button>
                 );
-              })
+              }),
             )}
           </div>
         </div>
@@ -582,25 +659,26 @@ export default function MaterialsPage() {
 
   // Filter state — default to user's own section
   const [filter, setFilter] = useState({
-    dept:  searchParams.get("dept")  || user?.dept  || "CSE",
+    dept: searchParams.get("dept") || user?.dept || "CSE",
     level: Number(searchParams.get("level") || user?.level || 1),
-    term:  Number(searchParams.get("term")  || user?.term  || 1),
+    term: Number(searchParams.get("term") || user?.term || 1),
   });
   const initCourseCode = searchParams.get("courseCode");
-  const initCategory   = searchParams.get("category");
+  const initCategory = searchParams.get("category");
 
   // Drill-down state
-  const [selectedFolder,   setSelectedFolder]   = useState(null); // SubjectFolder doc
+  const [selectedFolder, setSelectedFolder] = useState(null); // SubjectFolder doc
   const [selectedCategory, setSelectedCategory] = useState(null); // string e.g. "Mid"
-  const [showCreateModal,  setShowCreateModal]   = useState(false);
-  const [categoryModal,    setCategoryModal]     = useState(null); // folder waiting for category pick
-  
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [categoryModal, setCategoryModal] = useState(null); // folder waiting for category pick
 
   const userRole = user?.role;
-  const userId   = user?._id?.toString();
+  const userId = user?._id?.toString();
 
   // Fetch folders for current filter
-  const { data, isLoading, isError, refetch } = useGetFoldersQuery(filter, { skip: !filter.dept });
+  const { data, isLoading, isError, refetch } = useGetFoldersQuery(filter, {
+    skip: !filter.dept,
+  });
   const folders = data?.data || [];
 
   // Auto-select folder from URL params (dashboard navigation)
@@ -642,7 +720,6 @@ export default function MaterialsPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
         <div>
@@ -662,7 +739,6 @@ export default function MaterialsPage() {
       </div>
 
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-
         {/* ── Left: Filter panel ──────────────────────────────────────────── */}
         <FilterPanel
           filter={filter}
@@ -673,13 +749,14 @@ export default function MaterialsPage() {
 
         {/* ── Right: Content area ─────────────────────────────────────────── */}
         <div className="min-w-0 flex-1">
-
           {/* Breadcrumb */}
           <nav className="mb-4 flex items-center gap-1.5 text-sm text-gray-500">
             <span
               onClick={handleBack}
               className={cn(
-                selectedFolder ? "cursor-pointer hover:text-gray-900" : "text-gray-900 font-medium"
+                selectedFolder
+                  ? "cursor-pointer hover:text-gray-900"
+                  : "text-gray-900 font-medium",
               )}
             >
               {filter.dept} L{filter.level}T{filter.term}
@@ -694,7 +771,9 @@ export default function MaterialsPage() {
                   {selectedFolder.courseCode}
                 </span>
                 <span>/</span>
-                <span className="font-medium text-gray-900">{selectedCategory}</span>
+                <span className="font-medium text-gray-900">
+                  {selectedCategory}
+                </span>
               </>
             )}
           </nav>
@@ -717,7 +796,6 @@ export default function MaterialsPage() {
                 term={filter.term}
               />
             </div>
-
           ) : (
             /* ── Folder grid ────────────────────────────────────────────── */
             <>
@@ -733,7 +811,9 @@ export default function MaterialsPage() {
               ) : isError ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-red-100 bg-red-50 py-12 text-center">
                   <p className="text-2xl">⚠️</p>
-                  <p className="mt-2 text-sm text-red-600">Failed to load folders.</p>
+                  <p className="mt-2 text-sm text-red-600">
+                    Failed to load folders.
+                  </p>
                   <button
                     onClick={refetch}
                     className="mt-3 text-sm text-blue-600 hover:underline"
