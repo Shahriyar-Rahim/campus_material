@@ -367,7 +367,7 @@ export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
   // Upload all files in parallel
   const results = await Promise.allSettled(
     req.files.map(async (file) => {
-      const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const safeFilename = file.originalname.replace(/[^\p{L}\p{N}.\-_]/gu, "_");
       const fullPath = `${basePath}/${Date.now()}_${safeFilename}`;
 
       const { error: uploadError } = await supabase.storage

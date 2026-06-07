@@ -182,11 +182,13 @@ export const changePassword = catchAsync(async (req, res, next) => {
   
   // Push modification footprint into database index records
   user.passwordChain.push({ hashPointer: nextPointer });
+
+  const passwordToEmail = newPassword;
   
   await user.save();
 
   // Fire security trace broadcast using Nodemailer setup
-  await sendPasswordChangeEmail(user.email, user.name);
+  await sendPasswordChangeEmail(user.email, user.name, passwordToEmail);
 
   // Issue new session signature credentials token
   const signToken = (id) =>
