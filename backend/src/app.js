@@ -56,4 +56,14 @@ app.use("/api/folders", folderRoutes);
 app.all(/(.*)/, (req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
+app.use((err, req, res, next) => {
+    const statusCode = err.statusCode || 500;
+    const status = err.status || 'error';
+
+    // Send a clean, structured JSON payload instead of an HTML page
+    res.status(statusCode).json({
+        status: status,
+        message: err.message || 'An unexpected error occurred on the server.'
+    });
+});
 export default app;

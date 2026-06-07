@@ -107,6 +107,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  passwordChain: [
+  {
+    hashPointer: String,  // Crypto linking trace tracking updates
+    createdAt: { type: Date, default: Date.now }
+  }
+],
   passwordChangedAt: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,

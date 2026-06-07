@@ -14,29 +14,40 @@ export function LoginForm() {
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login failed.");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(form),
+    });
 
-      dispatch(setCredentials({ user: data.data.user, token: data.token }));
-      toast.success(`Welcome back, ${data.data.user.name}!`);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    // 1. Safe Check: Did the backend actually return JSON?
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error(`Server returned non-JSON response (${res.status}). Please check server logs.`);
     }
-  };
+
+    const data = await res.json();
+    
+    // 2. If response status is not 2xx, throw the message from our new backend JSON structure
+    if (!res.ok) {
+      throw new Error(data.message || "Login failed.");
+    }
+
+    dispatch(setCredentials({ user: data.data.user, token: data.token }));
+    toast.success(`Welcome back, ${data.data.user.name}!`);
+    navigate("/dashboard");
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

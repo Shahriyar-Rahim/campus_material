@@ -127,3 +127,29 @@ export const sendNudgeEmail = async ({ to, senderName, courseCode }) => {
     `,
   });
 };
+
+export const sendPasswordChangeEmail = async (toEmail, userName) => {
+  const mailOptions = {
+    from: `"Campus Portal Security" <shahriyarbaust@gmail.com>`,
+    to: toEmail,
+    subject: "⚠️ Alert: Your Campus Portal Password Was Changed",
+    html: `
+      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 8px;">
+        <h2 style="color: #dc2626;">Password Security Alert</h2>
+        <p>Hello <strong>${userName}</strong>,</p>
+        <p>This is a confirmation notification that the password for your Campus Portal account was recently updated.</p>
+        <p style="background-color: #f8fafc; padding: 12px; border-left: 4px solid #3b82f6; font-size: 13px; color: #475569;">
+          <strong>Security Note:</strong> We have compiled a unique identity chain signature for this modification event. If you did not perform this change, please contact your System Admin immediately to initiate a Rescue Chain Recovery sequence.
+        </p>
+        <p>Best regards,<br/>Campus Portal Security Team</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`🔒 Security alert email dispatched to: ${toEmail}`);
+  } catch (error) {
+    console.error("❌ Failed to dispatch security alert email:", error.message);
+  }
+};

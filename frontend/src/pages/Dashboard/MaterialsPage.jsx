@@ -446,75 +446,132 @@ function FolderCard({ folder, onOpen, onDelete, userRole, userId }) {
 }
 
 // ── Filter panel ──────────────────────────────────────────────────────────────
+// ── Responsive Filter panel ───────────────────────────────────────────────────
 function FilterPanel({ filter, onChange, userRole, userDept }) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:w-56">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Department
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {DEPTS.map((d) => (
-            <button
-              key={d}
-              onClick={() => onChange({ dept: d, level: filter.level, term: filter.term })}
-              className={cn(
-                "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
-                filter.dept === d
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              )}
+    <>
+      {/* 📱 MOBILE VIEW: Compact Dropdown Bar (Hidden on Desktop) */}
+      <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 sm:hidden w-full">
+        <div className="grid grid-cols-2 gap-2">
+          {/* Dept Dropdown */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Department
+            </label>
+            <select
+              value={filter.dept}
+              onChange={(e) => onChange({ ...filter, dept: e.target.value })}
+              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-700 focus:border-blue-500 focus:outline-none"
             >
-              {d}
-            </button>
-          ))}
+              {DEPTS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Level / Term Dropdown */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Semester
+            </label>
+            <select
+              value={`${filter.level}-${filter.term}`}
+              onChange={(e) => {
+                const [l, t] = e.target.value.split("-").map(Number);
+                onChange({ ...filter, level: l, term: t });
+              }}
+              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-700 focus:border-blue-500 focus:outline-none"
+            >
+              {LEVELS.map((l) =>
+                TERMS.map((t) => (
+                  <option key={`${l}-${t}`} value={`${l}-${t}`}>
+                    L{l} — T{t}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
         </div>
+
+        {/* Quick jump block for mobile */}
+        {userDept && filter.dept !== userDept && (
+          <button
+            onClick={() => onChange({ ...filter, dept: userDept })}
+            className="w-full rounded-lg border border-dashed border-blue-200 py-1.5 text-center text-xs font-medium text-blue-600 bg-blue-50/50"
+          >
+            Jump to My Dept ({userDept})
+          </button>
+        )}
       </div>
 
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Level / Term
-        </p>
-        <div className="flex flex-col gap-1">
-          {LEVELS.map((l) =>
-            TERMS.map((t) => {
-              const isActive = filter.level === l && filter.term === t;
-              return (
-                <button
-                  key={`${l}-${t}`}
-                  onClick={() => onChange({ dept: filter.dept, level: l, term: t })}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
-                    isActive
-                      ? "bg-blue-600 font-semibold text-white"
-                      : "text-gray-600 hover:bg-gray-50"
-                  )}
-                >
-                  <span>Level {l} — Term {t}</span>
-                  {isActive && <span className="text-xs opacity-80">●</span>}
-                </button>
-              );
-            })
-          )}
+      {/* 🖥️ DESKTOP VIEW: Sidebar Panel (Hidden on Mobile) */}
+      <aside className="hidden sm:flex w-56 shrink-0 flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4">
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Department
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {DEPTS.map((d) => (
+              <button
+                key={d}
+                onClick={() => onChange({ dept: d, level: filter.level, term: filter.term })}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                  filter.dept === d
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Quick jump to my section */}
-      {userDept && (
-        <button
-          onClick={() =>
-            onChange({
-              dept: userDept,
-              level: filter.level,
-              term: filter.term,
-            })
-          }
-          className="rounded-lg border border-dashed border-blue-300 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50"
-        >
-          Jump to my dept ({userDept})
-        </button>
-      )}
-    </aside>
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Level / Term
+          </p>
+          <div className="flex flex-col gap-1">
+            {LEVELS.map((l) =>
+              TERMS.map((t) => {
+                const isActive = filter.level === l && filter.term === t;
+                return (
+                  <button
+                    key={`${l}-${t}`}
+                    onClick={() => onChange({ dept: filter.dept, level: l, term: t })}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
+                      isActive
+                        ? "bg-blue-600 font-semibold text-white"
+                        : "text-gray-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <span>Level {l} — Term {t}</span>
+                    {isActive && <span className="text-xs opacity-80">●</span>}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {userDept && (
+          <button
+            onClick={() =>
+              onChange({
+                dept: userDept,
+                level: filter.level,
+                term: filter.term,
+              })
+            }
+            className="rounded-lg border border-dashed border-blue-300 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50"
+          >
+            Jump to my dept ({userDept})
+          </button>
+        )}
+      </aside>
+    </>
   );
 }
 

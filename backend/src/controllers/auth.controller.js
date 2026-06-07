@@ -4,7 +4,8 @@ import streamifier from "streamifier";
 import User from "../models/User.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
-import { sendWelcomeEmail } from "../services/email.service.js";
+import { sendWelcomeEmail, sendPasswordChangeEmail } from "../services/email.service.js";
+import { createHash } from "crypto";
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -142,52 +143,94 @@ export const getMe = catchAsync(async (req, res) => {
   res.status(200).json({ success: true, data: { user } });
 });
 
+// Helper to generate verification block pointers
+const generateChainPointer = (previousPointer, newPasswordHash) => {
+  return createHash("sha256") // 👈 Used directly now
+    .update(`${previousPointer || "GENESIS_BLOCK"}-${newPasswordHash}`)
+    .digest("hex");
+};
+
+// ── CHANGE PASSWORD WITH SECURE HASH TRAIL ──────────────────────────────────
 export const changePassword = catchAsync(async (req, res, next) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {
-    return next(new AppError("currentPassword and newPassword are required.", 400));
+    return next(new AppError("Current password and new password are required.", 400));
   }
 
   if (newPassword.length < 8) {
     return next(new AppError("New password must be at least 8 characters.", 400));
   }
 
-  const user = await User.findById(req.user._id).select("+password");
+  // Fetch password and existing historical chain tracking structures
+  const user = await User.findById(req.user._id).select("+password +passwordChain");
 
   if (!(await user.comparePassword(currentPassword))) {
     return next(new AppError("Your current password is incorrect.", 401));
   }
 
+  // Fetch current master trace pointer if it exists
+  const lastLink = user.passwordChain && user.passwordChain.length > 0 
+    ? user.passwordChain[user.passwordChain.length - 1].hashPointer 
+    : "";
+
+  // Set the clean password string (Triggering standard pre-save bcrypt routines inside model)
   user.password = newPassword;
+  
+  // Calculate historical cryptographic tracing pointers
+  const nextPointer = generateChainPointer(lastLink, user.password);
+  
+  // Push modification footprint into database index records
+  user.passwordChain.push({ hashPointer: nextPointer });
+  
   await user.save();
 
-  createSendToken(user, 200, res);
+  // Fire security trace broadcast using Nodemailer setup
+  await sendPasswordChangeEmail(user.email, user.name);
+
+  // Issue new session signature credentials token
+  const signToken = (id) =>
+    jwt.sign({ id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    });
+
+  const token = signToken(user._id);
+  res.cookie("jwt", token, {
+    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  });
+
+  user.password = undefined;
+  user.passwordChain = undefined; // Hide array matrix out of baseline payload returns
+
+  res.status(200).json({
+    success: true,
+    token,
+    data: { user },
+  });
 });
 
 export const updateProfile = catchAsync(async (req, res, next) => {
-
   if (req.body.password || req.body.role) {
     return next(new AppError("Use /change-password to update password. Role changes require admin.", 400));
   }
 
-const allowedUpdates = ["name", "level", "term"];
+  // Support 'session' properties inside permitted payload attributes whitelist
+  const allowedUpdates = ["name", "level", "term", "session"];
   const updates = {};
   allowedUpdates.forEach((f) => {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   });
 
-
   if (req.file) {
     const user = await User.findById(req.user._id);
-
     if (user.profilePicture?.publicId) {
       await cloudinary.uploader.destroy(user.profilePicture.publicId).catch(() => {});
     }
-
     const publicId = `campus-portal/profiles/${req.user._id}`;
     const result = await uploadToCloudinary(req.file.buffer, publicId);
-
     updates.profilePicture = {
       url: result.secure_url,
       publicId: result.public_id,
@@ -199,5 +242,8 @@ const allowedUpdates = ["name", "level", "term"];
     runValidators: true,
   });
 
-  res.status(200).json({ success: true, data: { user: updatedUser } });
+  res.status(200).json({
+    success: true,
+    data: { user: updatedUser },
+  });
 });
