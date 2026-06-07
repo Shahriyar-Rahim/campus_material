@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { format, addDays, subDays } from "date-fns";
+import { format, addDays, subDays, isValid, isBefore, isAfter } from "date-fns";
 import toast from "react-hot-toast";
 import { useRef } from "react";
 import {
@@ -57,7 +57,6 @@ function TaskCard({ task, index, onStatusChange, onDelete }) {
             isClass ? "border-purple-100 bg-purple-50" : "border-gray-100 bg-white"
           }`}
         >
-          {/* Drag handle / class indicator */}
           <div className="mt-0.5 shrink-0">
             {isClass ? (
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-200 text-xs">🏫</span>
@@ -66,7 +65,6 @@ function TaskCard({ task, index, onStatusChange, onDelete }) {
             )}
           </div>
 
-          {/* Content */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className={`text-sm font-medium text-gray-900 truncate ${task.status === "Done" ? "line-through text-gray-400" : ""}`}>
@@ -91,7 +89,6 @@ function TaskCard({ task, index, onStatusChange, onDelete }) {
             </div>
           </div>
 
-          {/* Status / actions */}
           {!isClass && (
             <div className="flex shrink-0 items-center gap-1">
               <select
@@ -117,72 +114,174 @@ function TaskCard({ task, index, onStatusChange, onDelete }) {
 
 function AddTaskForm({ onAdd }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ taskName: "", category: "Academic", priority: "Medium", deadline: "", description: "" });
+  const [form, setForm] = useState({ 
+    taskName: "", 
+    category: "Academic", 
+    priority: "Medium", 
+    deadline: "", 
+    description: "" 
+  });
   const [createTask, { isLoading }] = useCreateTaskMutation();
+
+  const validateAndParseDate = (dateString) => {
+    if (!dateString) return null;
+    const parsedDate = new Date(dateString);
+    
+    // Check if structural parsing failed entirely
+    if (!isValid(parsedDate)) return null;
+
+    // Prevent manual typos resulting in extreme values (e.g., Year 0202 instead of 2026)
+    const year = parsedDate.getFullYear();
+    if (year < 2020 || year > 2100) return null;
+
+    return parsedDate;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.taskName || !form.deadline) return;
-    const result = await createTask(form);
+
+    const validDate = validateAndParseDate(form.deadline);
+    if (!validDate) {
+      toast.error("Please provide a valid date/time (Year must be between 2020 and 2100)");
+      return;
+    }
+
+    const result = await createTask({
+      ...form,
+      deadline: validDate.toISOString()
+    });
+
     if (!result.error) {
-      toast.success("Task added!");
+      toast.success("Task added successfully!");
       setForm({ taskName: "", category: "Academic", priority: "Medium", deadline: "", description: "" });
       setOpen(false);
       onAdd?.();
     }
   };
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-gray-200 p-3 text-sm text-gray-400 hover:border-blue-300 hover:text-blue-600 transition-colors"
-      >
-        <span>+</span> Add task
-      </button>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
-      <input
-        className="input text-sm"
-        placeholder="Task name *"
-        value={form.taskName}
-        onChange={(e) => setForm((f) => ({ ...f, taskName: e.target.value }))}
-        autoFocus required
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <select className="input text-sm" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
-          <option>Academic</option>
-          <option>Personal</option>
-        </select>
-        <select className="input text-sm" value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
-      </div>
-      <input
-        type="datetime-local"
-        className="input text-sm"
-        value={form.deadline}
-        onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
-        required
-      />
-      <div className="flex gap-2">
-        <button type="submit" disabled={isLoading} className="btn-primary flex-1 justify-center py-2 text-sm">
-          {isLoading ? "Adding…" : "Add Task"}
+    <>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50/50 py-4 text-sm font-medium text-gray-500 hover:border-blue-400 hover:bg-blue-50/30 hover:text-blue-600 transition-all active:scale-[0.99]"
+        >
+          <span className="text-lg font-bold">＋</span> Add New Task
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="btn-ghost py-2 text-sm">Cancel</button>
-      </div>
-    </form>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm sm:absolute sm:inset-0 sm:z-auto sm:bg-transparent sm:backdrop-blur-none sm:justify-start">
+          <div className="absolute inset-0 -z-10 h-full w-full sm:hidden" onClick={() => setOpen(false)} />
+
+          <form 
+            onSubmit={handleSubmit} 
+            className="w-full max-h-[92vh] overflow-y-auto rounded-t-2xl border border-gray-100 bg-white p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200 sm:rounded-xl sm:border-blue-200 sm:bg-blue-50/70 sm:p-4 sm:shadow-none sm:animate-none"
+          >
+            <div className="mx-auto h-1.5 w-12 rounded-full bg-gray-300 sm:hidden" />
+
+            <div className="flex items-center justify-between sm:hidden">
+              <h3 className="text-base font-bold text-gray-900">Create New Task</h3>
+              <button type="button" onClick={() => setOpen(false)} className="text-gray-400 text-xl p-1">✕</button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider sm:hidden">Task Title</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all sm:py-2"
+                placeholder="What needs to be done? *"
+                value={form.taskName}
+                onChange={(e) => setForm((f) => ({ ...f, taskName: e.target.value }))}
+                autoFocus
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</label>
+                <div className="flex rounded-xl bg-gray-100 p-1 border border-gray-200/40">
+                  {["Academic", "Personal"].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, category: cat }))}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                        form.category === cat ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      {cat === "Academic" ? "📚 " : "🎯 "}{cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</label>
+                <div className="flex rounded-xl bg-gray-100 p-1 border border-gray-200/40">
+                  {["Low", "Medium", "High"].map((prio) => {
+                    const activeColors = {
+                      Low: "bg-white text-gray-600 shadow-sm border border-gray-200/60",
+                      Medium: "bg-amber-50 text-amber-700 shadow-sm border border-amber-200/60",
+                      High: "bg-red-50 text-red-700 shadow-sm border border-red-200/60"
+                    };
+                    return (
+                      <button
+                        key={prio}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, priority: prio }))}
+                        className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                          form.priority === prio ? activeColors[prio] : "text-gray-500 hover:text-gray-900"
+                        }`}
+                      >
+                        {prio}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date & Time</label>
+              <input
+                type="datetime-local"
+                min="2020-01-01T00:00"
+                max="2100-12-31T23:59"
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all sm:py-2"
+                value={form.deadline}
+                onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2 pb-4 sm:pb-0">
+              <button 
+                type="button" 
+                onClick={() => setOpen(false)} 
+                className="hidden sm:block btn-ghost py-2 text-sm font-medium border border-gray-200 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="btn-primary w-full justify-center py-3.5 text-sm font-bold shadow-lg shadow-blue-500/20 rounded-xl active:scale-[0.98] transition-all sm:py-2"
+              >
+                {isLoading ? "Saving Task..." : "✓ Confirm and Save"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
-
 export default function PlannerPage() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [showCalendarInput, setShowCalendarInput] = useState(false);
   const { data, isLoading, refetch } = useGetDailyPlannerQuery(date);
 
   const alertedTasks = useRef(new Set());
@@ -197,29 +296,24 @@ export default function PlannerPage() {
   const overdue   = data?.data?.overdueTasks || [];
   const summary   = data?.data?.summary;
 
-  // 1. Request Notification Permission on Mount
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
 
-  // 2. Deadline Watcher logic
   useEffect(() => {
     const checkDeadlines = () => {
       const now = new Date();
       const timeline = data?.data?.timeline || [];
 
       timeline.forEach((item) => {
-        // Only alert for tasks (not classes) that aren't 'Done' and haven't alerted yet
         if (item.type === "task" && item.status !== "Done" && item.deadline) {
           const deadlineDate = new Date(item.deadline);
-          
-          // Trigger if current time is within the same minute as deadline
           if (
             !alertedTasks.current.has(item._id) &&
             now >= deadlineDate &&
-            now < addDays(deadlineDate, 1) // Ensure it's for today
+            now < addDays(deadlineDate, 1)
           ) {
             triggerAlert(item);
             alertedTasks.current.add(item._id);
@@ -228,26 +322,18 @@ export default function PlannerPage() {
       });
     };
 
-    const interval = setInterval(checkDeadlines, 10000); // Check every 10 seconds
+    const interval = setInterval(checkDeadlines, 10000);
     return () => clearInterval(interval);
   }, [data]);
 
-  // 3. The Alert Function
   const triggerAlert = (task) => {
-    // Sound
     audioPlayer.current.play().catch(e => console.log("Audio play blocked"));
+    toast.error(`⏰ Deadline Reached: ${task.taskName}`, { duration: 6000, position: "top-center" });
 
-    // Toast Popup
-    toast.error(`⏰ Deadline Reached: ${task.taskName}`, {
-      duration: 6000,
-      position: "top-center",
-    });
-
-    // Browser Notification
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Task Reminder", {
         body: `It's time for: ${task.taskName}`,
-        icon: "/logo192.png", // Path to your app icon
+        icon: "/logo192.png",
       });
     }
   };
@@ -276,20 +362,65 @@ export default function PlannerPage() {
     refetch();
   };
 
+  // Validates the primary landscape date header change input
+  const handleMainDateChange = (e) => {
+    const value = e.target.value;
+    if (!value) return;
+
+    const parsed = new Date(value);
+    const year = parsed.getFullYear();
+
+    if (!isValid(parsed) || year < 2020 || year > 2100) {
+      toast.error("Invalid calendar year tracking parameter.");
+      return;
+    }
+    setDate(value);
+    setShowCalendarInput(false);
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Daily Planner</h1>
-          <p className="text-sm text-gray-500">{format(new Date(date), "EEEE, MMMM d, yyyy")}</p>
+          <button 
+            onClick={() => setShowCalendarInput(!showCalendarInput)}
+            className="text-left text-sm font-medium text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+          >
+            📅 {format(new Date(date), "EEEE, MMMM d, yyyy")}
+          </button>
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setDate(format(subDays(new Date(date), 1), "yyyy-MM-dd"))} className="btn-ghost p-2">←</button>
-          <button onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))} className="rounded-lg px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50">Today</button>
-          <button onClick={() => setDate(format(addDays(new Date(date), 1), "yyyy-MM-dd"))} className="btn-ghost p-2">→</button>
+        
+        <div className="flex items-center justify-between sm:justify-end gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100 sm:bg-transparent sm:p-0 sm:border-none">
+          <button onClick={() => setDate(format(subDays(new Date(date), 1), "yyyy-MM-dd"))} className="btn-ghost px-3 py-2 sm:p-2">←</button>
+          <button onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))} className="rounded-lg bg-white shadow-sm sm:shadow-none border border-gray-200/50 sm:border-none px-4 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50">Today</button>
+          <button onClick={() => setDate(format(addDays(new Date(date), 1), "yyyy-MM-dd"))} className="btn-ghost px-3 py-2 sm:p-2">→</button>
         </div>
       </div>
+
+      {/* Top Expansion Area for safe Date Navigation */}
+      {showCalendarInput && (
+        <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2 animate-in fade-in duration-150">
+          <label className="text-xs font-bold text-blue-700 uppercase tracking-wider">Jump to Date</label>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              min="2020-01-01"
+              max="2100-12-31"
+              value={date}
+              onChange={handleMainDateChange}
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <button 
+              onClick={() => setShowCalendarInput(false)}
+              className="rounded-lg bg-gray-200 px-3 text-xs font-medium text-gray-600 hover:bg-gray-300"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Progress summary */}
       {summary && (
@@ -327,7 +458,7 @@ export default function PlannerPage() {
         </div>
       )}
 
-      {/* Timeline (draggable) */}
+      {/* Timeline */}
       <h2 className="mb-3 text-sm font-medium text-gray-700">Timeline</h2>
       {isLoading ? (
         <LoadingSpinner />
