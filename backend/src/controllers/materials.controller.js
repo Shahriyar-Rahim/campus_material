@@ -412,7 +412,7 @@ export const bulkUploadMaterials = catchAsync(async (req, res, next) => {
         .getPublicUrl(fullPath);
 
       return Material.create({
-        title: fcleanBanglaName, // strip extension
+        title: cleanBanglaName, // strip extension
         fileName: cleanBanglaName,
         supabaseUrl: urlData.publicUrl,
         supabasePath: fullPath,
