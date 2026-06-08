@@ -446,7 +446,7 @@ function PresenceStrip({ courseCode }) {
             key={b.userId}
             onClick={() => sendNudge(b.userId, courseCode)}
             title={`Nudge ${b.name}`}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-green-200 text-xs font-bold text-green-800 hover:bg-green-300 transition-colors"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-green-200 text-xs font-bold text-green-800 hover:bg-green-300 transition-colors cursor-pointer"
           >
             {b.name[0].toUpperCase()}
           </button>

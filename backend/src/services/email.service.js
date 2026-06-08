@@ -113,18 +113,49 @@ export const sendWelcomeEmail = async ({
   });
 };
 
-export const sendNudgeEmail = async ({ to, senderName, courseCode }) => {
+// export const sendNudgeEmail = async ({ to, senderName, courseCode }) => {
+//   const transporter = createTransporter();
+
+//   await transporter.sendMail({
+//     from: `"Campus Materials Portal" <${process.env.MAIL_USER}>`,
+//     to,
+//     subject: `${senderName} nudged you — ${courseCode}`,
+//     html: `
+//       <p>Hey there!</p>
+//       <p><strong>${senderName}</strong> is studying <strong>${courseCode}</strong> right now and sent you a nudge.</p>
+//       <p><a href="${process.env.CLIENT_URL}/materials/${courseCode}">Join them on Campus Portal →</a></p>
+//     `,
+//   });
+// };
+
+export const sendNudgeEmail = async ({ to, targetName, senderName, courseCode }) => {
   const transporter = createTransporter();
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"/></head>
+    <body style="font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px;">
+      <div style="max-width: 500px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <h2 style="color: #1a1a2e; margin-top: 0;">⚡ Study Nudge Alert!</h2>
+        <p>Hello <strong>${targetName}</strong>,</p>
+        <p><strong>${senderName}</strong> noticed you are online and studying <strong>${courseCode}</strong> right now!</p>
+        <p style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 12px; color: #15803d; font-weight: 500;">
+          "Hey, let's look through the study materials together!"
+        </p>
+        <p style="font-size: 13px; color: #718096; margin-top: 24px;">
+          This is an automated quick-alert notification from your Campus Materials Portal.
+        </p>
+      </div>
+    </body>
+    </html>
+  `.trim();
 
   await transporter.sendMail({
     from: `"Campus Materials Portal" <${process.env.MAIL_USER}>`,
     to,
-    subject: `${senderName} nudged you — ${courseCode}`,
-    html: `
-      <p>Hey there!</p>
-      <p><strong>${senderName}</strong> is studying <strong>${courseCode}</strong> right now and sent you a nudge.</p>
-      <p><a href="${process.env.CLIENT_URL}/materials/${courseCode}">Join them on Campus Portal →</a></p>
-    `,
+    subject: `⚡ ${senderName} nudged you in ${courseCode}!`,
+    html,
   });
 };
 

@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import { sendNudgeEmail } from "../services/email.service.js";
 
 const coursePresence = new Map();
 
@@ -103,26 +104,48 @@ export const initSocket = (httpServer) => {
       User.findByIdAndUpdate(userId, { currentCourse: null }).exec();
     });
 
-    socket.on("nudge", ({ targetUserId, courseCode, message }) => {
-      const targetSocket = [...io.sockets.sockets.values()].find(
-        (s) => s.user?.userId === targetUserId
-      );
+    socket.on("nudge", async ({ targetUserId, courseCode, message }) => {
+      try {
+        const { userId: senderId, name: senderName } = socket.user;
+        if (!senderId || !targetUserId) return;
 
-      const nudgePayload = {
-        from: {
-          userId: socket.user.userId,
-          name: socket.user.name,
-          avatar: socket.user.avatar,
-        },
-        courseCode,
-        message: message || `${socket.user.name} is studying ${courseCode} and wants you to join!`,
-        timestamp: new Date().toISOString(),
-      };
+        // 1. Process the real-time live notification payload
+        const targetSocket = [...io.sockets.sockets.values()].find(
+          (s) => s.user?.userId === targetUserId
+        );
 
-      if (targetSocket) {
-        targetSocket.emit("nudge_received", nudgePayload);
-      } else {
-        io.to(`user:${targetUserId}`).emit("nudge_received", nudgePayload);
+        const nudgePayload = {
+          from: {
+            userId: socket.user.userId,
+            name: socket.user.name,
+            avatar: socket.user.avatar,
+          },
+          courseCode,
+          message: message || `${socket.user.name} is studying ${courseCode} and wants you to join!`,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Emit real-time notification if they are connected
+        if (targetSocket) {
+          targetSocket.emit("nudge_received", nudgePayload);
+        } else {
+          io.to(`user:${targetUserId}`).emit("nudge_received", nudgePayload);
+        }
+
+        // 2. Fetch the target user's email asynchronously from MongoDB to send the nudge email
+        const targetUserDoc = await User.findById(targetUserId).select("name email");
+        if (!targetUserDoc || !targetUserDoc.email) return;
+
+        // 3. Dispatch the fallback/nudge email via your email service
+        sendNudgeEmail({
+          to: targetUserDoc.email,
+          targetName: targetUserDoc.docName || targetUserDoc.name,
+          senderName: senderName,
+          courseCode: courseCode.toUpperCase()
+        }).catch((err) => console.error("[Email Error] Nudge failed to send:", err.message));
+
+      } catch (err) {
+        console.error("[Socket Nudge Handler Error]:", err.message);
       }
     });
 
