@@ -128,28 +128,39 @@ export const sendNudgeEmail = async ({ to, senderName, courseCode }) => {
   });
 };
 
-export const sendPasswordChangeEmail = async (toEmail, userName) => {
-  const mailOptions = {
-    from: `"Campus Portal Security" <shahriyarbaust@gmail.com>`,
+export const sendPasswordChangeEmail = async (toEmail, userName, password) => {
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `"Campus Portal Security" <${process.env.MAIL_USER}>`,
     to: toEmail,
-    subject: "⚠️ Alert: Your Campus Portal Password Was Changed",
+    subject: "⚠️ Your Campus Portal Password Was Changed",
     html: `
-      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 8px;">
-        <h2 style="color: #dc2626;">Password Security Alert</h2>
-        <p>Hello <strong>${userName}</strong>,</p>
-        <p>This is a confirmation notification that the password for your Campus Portal account was recently updated.</p>
-        <p style="background-color: #f8fafc; padding: 12px; border-left: 4px solid #3b82f6; font-size: 13px; color: #475569;">
-          <strong>Security Note:</strong> We have compiled a unique identity chain signature for this modification event. If you did not perform this change, please contact your System Admin immediately to initiate a Rescue Chain Recovery sequence.
-        </p>
-        <p>Best regards,<br/>Campus Portal Security Team</p>
+      <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+        <div style="background:#1a1a2e;padding:24px 32px">
+          <h2 style="color:#fff;margin:0;font-size:18px">Campus Materials Portal</h2>
+          <p style="color:#a0aec0;margin:4px 0 0;font-size:13px">BAUST — Security Alert</p>
+        </div>
+        <div style="padding:28px 32px">
+          <h3 style="color:#dc2626;margin:0 0 16px">🔒 Password Changed</h3>
+          <p style="color:#4a5568;line-height:1.7">Hello <strong>${userName}</strong>,</p>
+          <p style="color:#4a5568;line-height:1.7">
+            Your Campus Portal account password was recently changed.
+            If you made this change, no action is needed.
+          </p>
+          <div style="background:#fff5f5;border-left:4px solid #fc8181;border-radius:4px;padding:12px 16px;margin:20px 0;font-size:13px;color:#c53030">
+            ⚠ If you did NOT make this change, contact your Admin immediately
+            or use the forgot password option on the login page.
+          </div>
+          <a href="${process.env.CLIENT_URL}/login"
+             style="display:inline-block;background:#dc2626;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">
+            Secure My Account →
+          </a>
+        </div>
+        <div style="background:#f7fafc;padding:16px 32px;text-align:center;color:#a0aec0;font-size:12px">
+          Campus Materials Portal — BAUST
+        </div>
       </div>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`🔒 Security alert email dispatched to: ${toEmail}`);
-  } catch (error) {
-    console.error("❌ Failed to dispatch security alert email:", error.message);
-  }
+  });
 };

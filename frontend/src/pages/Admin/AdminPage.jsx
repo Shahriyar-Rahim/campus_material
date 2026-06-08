@@ -1,30 +1,41 @@
 import { useState } from "react";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { useSelector } from "react-redux";
-import { selectToken } from "../../redux/features/authSlice.js";
+import { selectToken, selectUserRole } from "../../redux/features/authSlice.js";
 import { useGetMaterialStatsQuery } from "../../redux/api/materialsApi.js";
-import { LoadingSpinner, ErrorComp, Badge } from "../../components/ui/index.jsx";
+import {
+  LoadingSpinner,
+  ErrorComp,
+  Badge,
+} from "../../components/ui/index.jsx";
+import { cn } from "../../utils/cn"
 import toast from "react-hot-toast";
 
 function useAdminData(endpoint) {
   const token = useSelector(selectToken);
-  const [data, setData]       = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  
+  const [error, setError] = useState(null);
 
   const fetch_ = async (params = "") => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/admin/${endpoint}${params}`,
-        { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.message);
       setData(json.data);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return { data, loading, error, refetch: fetch_ };
@@ -34,14 +45,14 @@ const fetchMaterials = async (filter = matFilter, page = 1) => {
   setMaterialsLoading(true);
   try {
     const params = new URLSearchParams({ page, limit: 20 });
-    if (filter.dept)   params.set("dept",   filter.dept);
-    if (filter.level)  params.set("level",  filter.level);
-    if (filter.term)   params.set("term",   filter.term);
+    if (filter.dept) params.set("dept", filter.dept);
+    if (filter.level) params.set("level", filter.level);
+    if (filter.term) params.set("term", filter.term);
     if (filter.search) params.set("search", filter.search);
 
     const res = await fetch(
       `${import.meta.env.VITE_API_URL}/admin/materials?${params}`,
-      { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+      { headers: { Authorization: `Bearer ${token}` }, credentials: "include" },
     );
     const json = await res.json();
     if (res.ok) {
@@ -55,12 +66,20 @@ const fetchMaterials = async (filter = matFilter, page = 1) => {
 };
 
 const handleDeleteMaterial = async (id, title) => {
-  if (!window.confirm(`Permanently delete "${title}"?\nThis removes it from storage too.`)) return;
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/materials/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-    credentials: "include",
-  });
+  if (
+    !window.confirm(
+      `Permanently delete "${title}"?\nThis removes it from storage too.`,
+    )
+  )
+    return;
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/admin/materials/${id}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    },
+  );
   if (res.ok) {
     toast.success("File permanently deleted.");
     setMaterials((m) => m.filter((f) => f._id !== id));
@@ -96,7 +115,9 @@ function CRCard({ cr }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-gray-900">{cr.name}</p>
-        <p className="text-xs text-gray-500">{cr.dept} L{cr.level}T{cr.term} · {cr.uploadCount} uploads</p>
+        <p className="text-xs text-gray-500">
+          {cr.dept} L{cr.level}T{cr.term} · {cr.uploadCount} uploads
+        </p>
       </div>
     </div>
   );
@@ -111,18 +132,26 @@ function UserRow({ user, onRoleChange, onDeactivate }) {
         <p className="font-medium text-gray-900">{user.name}</p>
         <p className="text-gray-500">{user.studentId}</p>
       </td>
-      <td className="px-3 py-3 text-sm text-gray-500">{user.dept} L{user.level}T{user.term}</td>
+      <td className="px-3 py-3 text-sm text-gray-500">
+        {user.dept} L{user.level}T{user.term}
+      </td>
       <td className="px-3 py-3">
         <select
           value={user.role}
           onChange={(e) => onRoleChange(user._id, e.target.value)}
           className="rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none"
         >
-          {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
       </td>
       <td className="px-3 py-3">
-        <span className={`badge text-xs ${user.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+        <span
+          className={`badge text-xs ${user.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+        >
           {user.isActive ? "Active" : "Inactive"}
         </span>
       </td>
@@ -141,6 +170,7 @@ function UserRow({ user, onRoleChange, onDeactivate }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const token = useSelector(selectToken);
+  const userRole = useSelector(selectUserRole);
   const [tab, setTab] = useState("dashboard");
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -149,23 +179,37 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [materials, setMaterials] = useState([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
-  const [matFilter, setMatFilter] = useState({ dept: "", level: "", term: "", search: "" });
+  const [matFilter, setMatFilter] = useState({
+    dept: "",
+    level: "",
+    term: "",
+    search: "",
+  });
   const [matPage, setMatPage] = useState(1);
   const [matTotal, setMatTotal] = useState(0);
-
+  const [requests, setRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsTotal, setRequestsTotal] = useState(0);
+  const [reqStatusFilter, setReqStatusFilter] = useState("");
+  const [replyModal, setReplyModal] = useState(null); // request being replied to
+  const [replyText, setReplyText] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
 
   const fetchMaterials = async (filter = matFilter, page = 1) => {
     setMaterialsLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: 20 });
-      if (filter.dept)   params.set("dept",   filter.dept);
-      if (filter.level)  params.set("level",  filter.level);
-      if (filter.term)   params.set("term",   filter.term);
+      if (filter.dept) params.set("dept", filter.dept);
+      if (filter.level) params.set("level", filter.level);
+      if (filter.term) params.set("term", filter.term);
       if (filter.search) params.set("search", filter.search);
 
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/admin/materials?${params}`,
-        { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
       );
       const json = await res.json();
       if (res.ok) {
@@ -179,12 +223,20 @@ export default function AdminPage() {
   };
 
   const handleDeleteMaterial = async (id, title) => {
-    if (!window.confirm(`Permanently delete "${title}"?\nThis removes it from storage too.`)) return;
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/materials/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: "include",
-    });
+    if (
+      !window.confirm(
+        `Permanently delete "${title}"?\nThis removes it from storage too.`,
+      )
+    )
+      return;
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/admin/materials/${id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      },
+    );
     if (res.ok) {
       toast.success("File permanently deleted.");
       setMaterials((m) => m.filter((f) => f._id !== id));
@@ -198,12 +250,18 @@ export default function AdminPage() {
   const fetchStats = async () => {
     setStatsLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }, credentials: "include"
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/admin/dashboard`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
+      );
       const json = await res.json();
       if (res.ok) setStats(json.data);
-    } finally { setStatsLoading(false); }
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   const fetchUsers = async (role = "") => {
@@ -211,31 +269,45 @@ export default function AdminPage() {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/admin/users${role ? `?role=${role}` : ""}`,
-        { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
       );
       const json = await res.json();
       if (res.ok) setUsers(json.data);
-    } finally { setUsersLoading(false); }
+    } finally {
+      setUsersLoading(false);
+    }
   };
 
   const handleTabChange = (t) => {
-  setTab(t);
-  if (t === "dashboard" && !stats) fetchStats();
-  if (t === "users"     && users.length === 0) fetchUsers();
-  if (t === "materials" && materials.length === 0) fetchMaterials(); // ← add
-};
+    setTab(t);
+    if (t === "dashboard" && !stats) fetchStats();
+    if (t === "users" && users.length === 0) fetchUsers();
+    if (t === "materials" && materials.length === 0) fetchMaterials();
+    if (t === "requests" && requests.length === 0) fetchRequests();
+  };
 
   const handleRoleChange = async (userId, role) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${userId}/role`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      credentials: "include",
-      body: JSON.stringify({ role }),
-    });
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/admin/users/${userId}/role`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ role }),
+      },
+    );
     const json = await res.json();
     if (res.ok) {
       toast.success(`Role updated to ${role}.`);
-      setUsers((u) => u.map((user) => user._id === userId ? { ...user, role } : user));
+      setUsers((u) =>
+        u.map((user) => (user._id === userId ? { ...user, role } : user)),
+      );
     } else {
       toast.error(json.message || "Failed to update role.");
     }
@@ -243,62 +315,191 @@ export default function AdminPage() {
 
   const handleDeactivate = async (userId) => {
     if (!window.confirm("Deactivate this user?")) return;
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${userId}/deactivate`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: "include",
-    });
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/admin/users/${userId}/deactivate`,
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      },
+    );
     if (res.ok) {
       toast.success("User deactivated.");
-      setUsers((u) => u.map((user) => user._id === userId ? { ...user, isActive: false } : user));
+      setUsers((u) =>
+        u.map((user) =>
+          user._id === userId ? { ...user, isActive: false } : user,
+        ),
+      );
     }
   };
 
   // Load dashboard on first render
-  useState(() => { fetchStats(); }, []);
+  useState(() => {
+    fetchStats();
+  }, []);
+
+  const fetchRequests = async (status = "") => {
+    setRequestsLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: 50 });
+      if (status) params.set("status", status);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/requests?${params}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
+      );
+      const json = await res.json();
+      if (res.ok) {
+        setRequests(json.data);
+        setRequestsTotal(json.total);
+      }
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (id, status) => {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/requests/${id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      },
+    );
+    if (res.ok) {
+      toast.success(`Status updated to ${status}`);
+      setRequests((r) =>
+        r.map((req) => (req._id === id ? { ...req, status } : req)),
+      );
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
+    setReplyLoading(true);
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/requests/${replyModal._id}/reply`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ reply: replyText }),
+      },
+    );
+    const json = await res.json();
+    if (res.ok) {
+      toast.success("Reply sent to student.");
+      setRequests((r) =>
+        r.map((req) => (req._id === replyModal._id ? json.data : req)),
+      );
+      setReplyModal(null);
+      setReplyText("");
+    } else {
+      toast.error(json.message || "Failed.");
+    }
+    setReplyLoading(false);
+  };
+
+  const handleDeleteRequest = async (id) => {
+    if (!window.confirm("Delete this request?")) return;
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/requests/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    });
+    if (res.ok) {
+      toast.success("Request deleted.");
+      setRequests((r) => r.filter((req) => req._id !== id));
+    }
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <h1 className="mb-6 text-xl font-bold text-gray-900">Admin Dashboard</h1>
 
       {/* Tabs */}
-      {["dashboard", "users", "materials"].map((t) => (
-  <button
-    key={t}
-    onClick={() => handleTabChange(t)}
-    className={`rounded-lg px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
-      tab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
-    }`}
-  >
-    {t}
-  </button>
-))}
+      {["dashboard", "users", "materials", "requests"].map((t) => (
+        <button
+          key={t}
+          onClick={() => handleTabChange(t)}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+            tab === t
+              ? "bg-white shadow text-gray-900"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          {t}
+        </button>
+      ))}
 
       {/* Dashboard tab */}
-      {tab === "dashboard" && (
-        statsLoading ? <LoadingSpinner /> : !stats ? (
-          <button onClick={fetchStats} className="btn-primary">Load Stats</button>
+      {tab === "dashboard" &&
+        (statsLoading ? (
+          <LoadingSpinner />
+        ) : !stats ? (
+          <button onClick={fetchStats} className="btn-primary">
+            Load Stats
+          </button>
         ) : (
           <div className="space-y-6">
             {/* User stats */}
             <div>
-              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">Users</h2>
+              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Users
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Students"    value={stats.users.totalStudents} icon="🎓" />
-                <StatCard label="CRs"         value={stats.users.totalCRs}      icon="📋" />
-                <StatCard label="Teachers"    value={stats.users.totalTeachers} icon="👨‍🏫" />
-                <StatCard label="Online now"  value={stats.users.activeUsers}   icon="🟢" />
+                <StatCard
+                  label="Students"
+                  value={stats.users.totalStudents}
+                  icon="🎓"
+                />
+                <StatCard label="CRs" value={stats.users.totalCRs} icon="📋" />
+                <StatCard
+                  label="Teachers"
+                  value={stats.users.totalTeachers}
+                  icon="👨‍🏫"
+                />
+                <StatCard
+                  label="Online now"
+                  value={stats.users.activeUsers}
+                  icon="🟢"
+                />
               </div>
             </div>
 
             {/* Material stats */}
             <div>
-              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">Materials</h2>
+              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Materials
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Total Files"    value={stats.materials.totalFiles}              icon="📁" />
-                <StatCard label="Storage Used"   value={`${stats.materials.totalStorageMB} MB`} icon="☁️" />
+                <StatCard
+                  label="Total Files"
+                  value={stats.materials.totalFiles}
+                  icon="📁"
+                />
+                <StatCard
+                  label="Storage Used"
+                  value={`${stats.materials.totalStorageMB} MB`}
+                  icon="☁️"
+                />
                 {stats.materials.byCategory.slice(0, 2).map((c) => (
-                  <StatCard key={c._id} label={c._id} value={c.count} icon="📄" />
+                  <StatCard
+                    key={c._id}
+                    label={c._id}
+                    value={c.count}
+                    icon="📄"
+                  />
                 ))}
               </div>
             </div>
@@ -306,8 +507,13 @@ export default function AdminPage() {
             {/* CR block */}
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Top CRs</h2>
-                <button onClick={() => handleTabChange("users")} className="text-xs text-blue-600 hover:underline">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  Top CRs
+                </h2>
+                <button
+                  onClick={() => handleTabChange("users")}
+                  className="text-xs text-blue-600 hover:underline"
+                >
                   View all →
                 </button>
               </div>
@@ -320,24 +526,38 @@ export default function AdminPage() {
 
             {/* Recent uploads */}
             <div>
-              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">Recent Uploads</h2>
+              <h2 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Recent Uploads
+              </h2>
               <div className="card divide-y divide-gray-50">
                 {stats.materials.recentFiles.map((f) => (
-                  <div key={f._id} className="flex items-center gap-3 px-4 py-3">
+                  <div
+                    key={f._id}
+                    className="flex items-center gap-3 px-4 py-3"
+                  >
                     <span className="text-xl">📄</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">{f.title}</p>
-                      <p className="text-xs text-gray-500">{f.dept} · {f.category} · by {f.uploadedBy?.name}</p>
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        {f.title}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {f.dept} · {f.category} · by {f.uploadedBy?.name}
+                      </p>
                     </div>
-                    <a href={f.supabaseUrl} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline">View</a>
+                    <a
+                      href={f.supabaseUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      View
+                    </a>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        )
-      )}
+        ))}
 
       {/* Users tab */}
       {tab === "users" && (
@@ -345,30 +565,44 @@ export default function AdminPage() {
           <div className="mb-4 flex items-center gap-3">
             <select
               value={roleFilter}
-              onChange={(e) => { setRoleFilter(e.target.value); fetchUsers(e.target.value); }}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                fetchUsers(e.target.value);
+              }}
               className="input w-36 text-sm"
             >
               <option value="">All roles</option>
               {["Student", "CR", "Teacher", "Admin"].map((r) => (
-                <option key={r} value={r}>{r}</option>
+                <option key={r} value={r}>
+                  {r}
+                </option>
               ))}
             </select>
             <span className="text-sm text-gray-500">{users.length} users</span>
           </div>
 
-          {usersLoading ? <LoadingSpinner /> : (
+          {usersLoading ? (
+            <LoadingSpinner />
+          ) : (
             <div className="card overflow-hidden">
               <table className="w-full text-left">
                 <thead className="border-b border-gray-100 bg-gray-50">
                   <tr>
                     {["Name / ID", "Section", "Role", "Status", ""].map((h) => (
-                      <th key={h} className="py-3 px-3 text-xs font-semibold text-gray-500 first:pl-4 last:pr-4">{h}</th>
+                      <th
+                        key={h}
+                        className="py-3 px-3 text-xs font-semibold text-gray-500 first:pl-4 last:pr-4"
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <UserRow key={user._id} user={user}
+                    <UserRow
+                      key={user._id}
+                      user={user}
                       onRoleChange={handleRoleChange}
                       onDeactivate={handleDeactivate}
                     />
@@ -376,7 +610,9 @@ export default function AdminPage() {
                 </tbody>
               </table>
               {users.length === 0 && (
-                <div className="py-10 text-center text-sm text-gray-500">No users found.</div>
+                <div className="py-10 text-center text-sm text-gray-500">
+                  No users found.
+                </div>
               )}
             </div>
           )}
@@ -384,158 +620,375 @@ export default function AdminPage() {
       )}
 
       {/* Materials tab */}
-{tab === "materials" && (
-  <div>
-    {/* Filters */}
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <input
-        placeholder="Search title, course, file..."
-        value={matFilter.search}
-        onChange={(e) => setMatFilter((f) => ({ ...f, search: e.target.value }))}
-        onKeyDown={(e) => e.key === "Enter" && fetchMaterials({ ...matFilter })}
-        className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 w-48"
-      />
-      <select
-        value={matFilter.dept}
-        onChange={(e) => {
-          const f = { ...matFilter, dept: e.target.value };
-          setMatFilter(f);
-          fetchMaterials(f);
-        }}
-        className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
-      >
-        <option value="">All Depts</option>
-        {["CSE","EEE","ME","CE","TE","BBA","ENG"].map((d) => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
-      <select
-        value={matFilter.level}
-        onChange={(e) => {
-          const f = { ...matFilter, level: e.target.value };
-          setMatFilter(f);
-          fetchMaterials(f);
-        }}
-        className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
-      >
-        <option value="">All Levels</option>
-        {[1,2,3,4].map((l) => <option key={l} value={l}>L{l}</option>)}
-      </select>
-      <select
-        value={matFilter.term}
-        onChange={(e) => {
-          const f = { ...matFilter, term: e.target.value };
-          setMatFilter(f);
-          fetchMaterials(f);
-        }}
-        className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
-      >
-        <option value="">All Terms</option>
-        {[1,2].map((t) => <option key={t} value={t}>T{t}</option>)}
-      </select>
-      <button
-        onClick={() => fetchMaterials(matFilter)}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-      >
-        Search
-      </button>
-      <span className="ml-auto text-sm text-gray-500">{matTotal} files</span>
-    </div>
-
-    {/* Table */}
-    {materialsLoading ? <LoadingSpinner /> : (
-      <div className="card overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="border-b border-gray-100 bg-gray-50">
-            <tr>
-              {["File", "Course", "Section", "Uploaded by", "Size", ""].map((h) => (
-                <th key={h} className="py-3 px-3 text-xs font-semibold text-gray-500 first:pl-4 last:pr-4">
-                  {h}
-                </th>
+      {tab === "materials" && (
+        <div>
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <input
+              placeholder="Search title, course, file..."
+              value={matFilter.search}
+              onChange={(e) =>
+                setMatFilter((f) => ({ ...f, search: e.target.value }))
+              }
+              onKeyDown={(e) =>
+                e.key === "Enter" && fetchMaterials({ ...matFilter })
+              }
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 w-48"
+            />
+            <select
+              value={matFilter.dept}
+              onChange={(e) => {
+                const f = { ...matFilter, dept: e.target.value };
+                setMatFilter(f);
+                fetchMaterials(f);
+              }}
+              className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+            >
+              <option value="">All Depts</option>
+              {["CSE", "EEE", "ME", "CE", "TE", "BBA", "ENG"].map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {materials.map((m) => (
-              <tr key={m._id} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="py-3 pl-4 pr-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
-                      {m.fileName?.split(".").pop()?.toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="max-w-[180px] truncate text-sm font-medium text-gray-900">
-                        {m.title}
-                      </p>
-                      <p className="text-xs text-gray-400">{m.category}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-3 py-3 text-sm text-gray-600">{m.courseCode}</td>
-                <td className="px-3 py-3 text-xs text-gray-500">
-                  {m.dept} L{m.level}T{m.term}
-                </td>
-                <td className="px-3 py-3 text-xs text-gray-500">
-                  <p>{m.uploadedBy?.name}</p>
-                  <p className="text-gray-400">{m.uploadedBy?.role}</p>
-                </td>
-                <td className="px-3 py-3 text-xs text-gray-400">
-                  {m.fileSize ? `${(m.fileSize / 1024).toFixed(0)} KB` : "—"}
-                </td>
-                <td className="py-3 pl-3 pr-4">
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={m.supabaseUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
+            </select>
+            <select
+              value={matFilter.level}
+              onChange={(e) => {
+                const f = { ...matFilter, level: e.target.value };
+                setMatFilter(f);
+                fetchMaterials(f);
+              }}
+              className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+            >
+              <option value="">All Levels</option>
+              {[1, 2, 3, 4].map((l) => (
+                <option key={l} value={l}>
+                  L{l}
+                </option>
+              ))}
+            </select>
+            <select
+              value={matFilter.term}
+              onChange={(e) => {
+                const f = { ...matFilter, term: e.target.value };
+                setMatFilter(f);
+                fetchMaterials(f);
+              }}
+              className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+            >
+              <option value="">All Terms</option>
+              {[1, 2].map((t) => (
+                <option key={t} value={t}>
+                  T{t}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => fetchMaterials(matFilter)}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            >
+              Search
+            </button>
+            <span className="ml-auto text-sm text-gray-500">
+              {matTotal} files
+            </span>
+          </div>
+
+          {/* Table */}
+          {materialsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="card overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="border-b border-gray-100 bg-gray-50">
+                  <tr>
+                    {[
+                      "File",
+                      "Course",
+                      "Section",
+                      "Uploaded by",
+                      "Size",
+                      "",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="py-3 px-3 text-xs font-semibold text-gray-500 first:pl-4 last:pr-4"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {materials.map((m) => (
+                    <tr
+                      key={m._id}
+                      className="border-b border-gray-50 hover:bg-gray-50"
                     >
-                      View
-                    </a>
+                      <td className="py-3 pl-4 pr-3">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                            {m.fileName?.split(".").pop()?.toUpperCase()}
+                          </span>
+                          <div>
+                            <p className="max-w-[180px] truncate text-sm font-medium text-gray-900">
+                              {m.title}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {m.category}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm text-gray-600">
+                        {m.courseCode}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-gray-500">
+                        {m.dept} L{m.level}T{m.term}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-gray-500">
+                        <p>{m.uploadedBy?.name}</p>
+                        <p className="text-gray-400">{m.uploadedBy?.role}</p>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-gray-400">
+                        {m.fileSize
+                          ? `${(m.fileSize / 1024).toFixed(0)} KB`
+                          : "—"}
+                      </td>
+                      <td className="py-3 pl-3 pr-4">
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={m.supabaseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View
+                          </a>
+                          <button
+                            onClick={() => handleDeleteMaterial(m._id, m.title)}
+                            className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {materials.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-10 text-center text-sm text-gray-400"
+                      >
+                        No files found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {matTotal > 20 && (
+                <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+                  <span className="text-xs text-gray-500">
+                    Page {matPage} of {Math.ceil(matTotal / 20)}
+                  </span>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => handleDeleteMaterial(m._id, m.title)}
-                      className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                      disabled={matPage === 1}
+                      onClick={() => fetchMaterials(matFilter, matPage - 1)}
+                      className="rounded-lg border border-gray-200 px-3 py-1 text-xs disabled:opacity-40"
                     >
-                      Delete
+                      ← Prev
+                    </button>
+                    <button
+                      disabled={matPage >= Math.ceil(matTotal / 20)}
+                      onClick={() => fetchMaterials(matFilter, matPage + 1)}
+                      className="rounded-lg border border-gray-200 px-3 py-1 text-xs disabled:opacity-40"
+                    >
+                      Next →
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {materials.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-10 text-center text-sm text-gray-400">
-                  No files found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Request Tabn */}
+      {tab === "requests" && (
+  <div>
+    {/* Filter bar */}
+    <div className="mb-4 flex items-center gap-3">
+      {["", "Pending", "InProgress", "Fulfilled", "Declined"].map((s) => (
+        <button key={s}
+          onClick={() => { setReqStatusFilter(s); fetchRequests(s); }}
+          className={cn(
+            "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+            reqStatusFilter === s
+              ? "border-blue-500 bg-blue-50 text-blue-700"
+              : "border-gray-200 text-gray-500 hover:border-gray-300"
+          )}
+        >
+          {s || "All"}
+        </button>
+      ))}
+      <span className="ml-auto text-sm text-gray-500">{requestsTotal} requests</span>
+    </div>
 
-        {/* Pagination */}
-        {matTotal > 20 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-            <span className="text-xs text-gray-500">
-              Page {matPage} of {Math.ceil(matTotal / 20)}
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={matPage === 1}
-                onClick={() => fetchMaterials(matFilter, matPage - 1)}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-xs disabled:opacity-40"
-              >
-                ← Prev
-              </button>
-              <button
-                disabled={matPage >= Math.ceil(matTotal / 20)}
-                onClick={() => fetchMaterials(matFilter, matPage + 1)}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-xs disabled:opacity-40"
-              >
-                Next →
-              </button>
+    {requestsLoading ? (
+      <div className="flex justify-center py-10">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {requests.length === 0 && (
+          <div className="py-10 text-center text-sm text-gray-400">No requests found.</div>
+        )}
+        {requests.map((req) => (
+          <div key={req._id} className="card p-4">
+            <div className="flex items-start gap-3">
+              {/* Avatar */}
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                {req.requestedBy?.name?.[0]?.toUpperCase()}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                {/* Header */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-gray-900">{req.requestedBy?.name}</span>
+                  <span className="text-xs text-gray-400">{req.requestedBy?.studentId}</span>
+                  <span className="text-xs text-gray-400">
+                    {req.dept} L{req.level}T{req.term}
+                  </span>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-medium ml-auto",
+                    req.status === "Pending"    ? "bg-gray-100 text-gray-600"  :
+                    req.status === "InProgress" ? "bg-blue-100 text-blue-700"  :
+                    req.status === "Fulfilled"  ? "bg-green-100 text-green-700":
+                    "bg-red-100 text-red-700"
+                  )}>
+                    {req.status}
+                  </span>
+                </div>
+
+                {/* Course + category */}
+                <div className="mt-1 flex items-center gap-2">
+                  {req.courseCode && (
+                    <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                      {req.courseCode}
+                    </span>
+                  )}
+                  {req.courseName && (
+                    <span className="text-xs text-gray-500">{req.courseName}</span>
+                  )}
+                  <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    {req.category}
+                  </span>
+                </div>
+
+                {/* Description */}
+                <p className="mt-2 text-sm text-gray-700">{req.description}</p>
+
+                {/* Existing reply */}
+                {req.reply && (
+                  <div className="mt-2 rounded-lg border-l-4 border-blue-400 bg-blue-50 px-3 py-2">
+                    <p className="text-xs font-medium text-blue-700">
+                      Reply by {req.repliedBy?.name} · {new Date(req.repliedAt).toLocaleDateString("en-GB")}
+                    </p>
+                    <p className="mt-0.5 text-sm text-blue-800">{req.reply}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <select
+                    value={req.status}
+                    onChange={(e) => handleStatusChange(req._id, e.target.value)}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none"
+                  >
+                    {["Pending", "InProgress", "Fulfilled", "Declined"].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => { setReplyModal(req); setReplyText(req.reply || ""); }}
+                    className="rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    {req.reply ? "✏️ Edit Reply" : "💬 Reply"}
+                  </button>
+
+                  {["Admin", "SuperAdmin"].includes(userRole) && (
+                    <button
+                      onClick={() => handleDeleteRequest(req._id)}
+                      className="rounded-lg px-3 py-1 text-xs text-red-500 hover:bg-red-50"
+                    >
+                      🗑 Delete
+                    </button>
+                  )}
+
+                  <span className="ml-auto text-xs text-gray-400">
+                    {new Date(req.createdAt).toLocaleDateString("en-GB", {
+                      day: "numeric", month: "short", year: "numeric"
+                    })}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        ))}
+      </div>
+    )}
+
+    {/* Reply modal */}
+    {replyModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={() => setReplyModal(null)}>
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          onClick={(e) => e.stopPropagation()}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Reply to Request</h2>
+              <p className="text-xs text-gray-500">
+                {replyModal.requestedBy?.name} · {replyModal.courseCode || "General"} · {replyModal.category}
+              </p>
+            </div>
+            <button onClick={() => setReplyModal(null)}
+              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">✕</button>
+          </div>
+
+          <div className="mb-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <p className="text-xs font-medium text-gray-400 mb-1">Original request:</p>
+            {replyModal.description}
+          </div>
+
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Write your reply... (this will be emailed to the student)"
+            rows={4}
+            maxLength={1000}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none"
+            autoFocus
+          />
+          <p className="mt-1 text-right text-xs text-gray-400">{replyText.length}/1000</p>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleReply}
+              disabled={!replyText.trim() || replyLoading}
+              className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {replyLoading ? "Sending…" : "Send Reply"}
+            </button>
+            <button onClick={() => setReplyModal(null)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )}
   </div>

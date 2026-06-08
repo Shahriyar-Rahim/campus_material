@@ -6,6 +6,8 @@ import {
   getMe,
   changePassword,
   updateProfile,
+  forgotPassword, 
+  resetPassword,
 } from "../controllers/auth.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { authLimiter, multerUpload, handleMulterError } from "../middleware/rateLimiter.js";
@@ -17,6 +19,8 @@ router.post("/login",    authLimiter, login);
 router.post("/logout",   protect, logout);
 router.get( "/me",       protect, getMe);
 router.patch("/change-password", protect, changePassword);
+router.post("/forgot-password",          forgotPassword);
+router.patch("/reset-password/:token",   resetPassword);
 router.patch(
   "/update-profile",
   protect,

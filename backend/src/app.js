@@ -42,6 +42,7 @@ import plannerRoutes from "./routes/planner.routes.js";
 import routineRoutes, { adminRouter } from "./routes/routine.routes.js";
 import AppError from './utils/AppError.js';
 import folderRoutes from "./routes/folders.routes.js";
+import requestRoutes from "./routes/requests.routes.js";
 
 // api routes ekhane
 app.use("/api/auth",      authRoutes);
@@ -50,6 +51,7 @@ app.use("/api/materials", materialRoutes);
 app.use("/api/planner",   plannerRoutes);
 app.use("/api/admin",     adminRouter);
 app.use("/api/folders", folderRoutes);
+app.use("/api/requests", requestRoutes);
 
 // 404 handler ekhane
 

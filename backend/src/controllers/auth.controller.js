@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary";
 import streamifier from "streamifier";
+import nodemailer from "nodemailer"
 import User from "../models/user.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/AppError.js";
 import { sendWelcomeEmail, sendPasswordChangeEmail } from "../services/email.service.js";
-import { createHash } from "crypto";
+import crypto,{ createHash } from "crypto";
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -21,6 +22,7 @@ const createSendToken = (user, statusCode, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
   });
+
 
   user.password = undefined;
 
@@ -150,7 +152,6 @@ const generateChainPointer = (previousPointer, newPasswordHash) => {
     .digest("hex");
 };
 
-// ── CHANGE PASSWORD WITH SECURE HASH TRAIL ──────────────────────────────────
 export const changePassword = catchAsync(async (req, res, next) => {
   const { currentPassword, newPassword } = req.body;
 
@@ -182,15 +183,12 @@ export const changePassword = catchAsync(async (req, res, next) => {
   
   // Push modification footprint into database index records
   user.passwordChain.push({ hashPointer: nextPointer });
-
-  const passwordToEmail = newPassword;
   
   await user.save();
 
   // Fire security trace broadcast using Nodemailer setup
-  await sendPasswordChangeEmail(user.email, user.name, passwordToEmail);
+  await sendPasswordChangeEmail(user.email, user.name);
 
-  // Issue new session signature credentials token
   const signToken = (id) =>
     jwt.sign({ id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -212,6 +210,108 @@ export const changePassword = catchAsync(async (req, res, next) => {
     token,
     data: { user },
   });
+});
+
+export const forgotPassword = catchAsync(async (req, res, next) => {
+  const { studentId, email } = req.body;
+  if (!studentId && !email) {
+    return next(new AppError("Provide your Student ID or email.", 400));
+  }
+
+  const user = await User.findOne(
+    studentId ? { studentId } : { email: email.toLowerCase() }
+  );
+
+  // Always respond OK — don't leak whether user exists
+  if (!user) {
+    return res.status(200).json({
+      success: true,
+      message: "If that account exists, a reset link has been sent.",
+    });
+  }
+
+  // Generate reset token
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  user.passwordResetToken   = crypto.createHash("sha256").update(resetToken).digest("hex");
+  user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  await user.save({ validateBeforeSave: false });
+
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST || "smtp.gmail.com",
+    port: Number(process.env.MAIL_PORT) || 587,
+    secure: false,
+    auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `"Campus Portal" <${process.env.MAIL_USER}>`,
+      to: user.email,
+      subject: "Password Reset — Campus Materials Portal",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+          <h2 style="color:#1d4ed8">Reset Your Password</h2>
+          <p>Hi ${user.name},</p>
+          <p>Click the button below to reset your password. This link expires in <strong>10 minutes</strong>.</p>
+          <p style="margin:24px 0">
+            <a href="${resetUrl}"
+               style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">
+              Reset Password
+            </a>
+          </p>
+          <p style="color:#6b7280;font-size:12px">
+            If you didn't request this, ignore this email. Your password won't change.
+          </p>
+          <p style="color:#9ca3af;font-size:11px;margin-top:16px">
+            Link: ${resetUrl}
+          </p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    user.passwordResetToken   = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new AppError("Failed to send reset email. Try again later.", 500));
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "If that account exists, a reset link has been sent.",
+  });
+});
+
+export const resetPassword = catchAsync(async (req, res, next) => {
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(req.params.token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken:   hashedToken,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return next(new AppError("Token is invalid or has expired.", 400));
+  }
+
+  const { password } = req.body;
+  if (!password || password.length < 8) {
+    return next(new AppError("Password must be at least 8 characters.", 400));
+  }
+
+  user.password             = password;
+  user.passwordResetToken   = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  sendPasswordChangeEmail(user.email, user.name)
+    .catch((err) => console.error("[Email] Reset confirmation email failed:", err.message));
+
+  createSendToken(user, 200, res);
 });
 
 export const updateProfile = catchAsync(async (req, res, next) => {

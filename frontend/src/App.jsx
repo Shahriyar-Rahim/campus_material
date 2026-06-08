@@ -8,6 +8,7 @@ import NavBar from "../src/components/NavBar.jsx";
 // Pages
 import HomePage        from "../src/pages/Home/HomePage.jsx";
 import LoginPage       from "../src/pages/Auth/LoginPage.jsx";
+import ResetPasswordPage from "../src/pages/Auth/ResetPasswordPage.jsx";
 import RegisterPage    from "../src/pages/Auth/RegisterPage.jsx";
 import DashboardPage   from "../src/pages/Dashboard/DashboardPage.jsx";
 import MaterialsPage   from "../src/pages/Dashboard/MaterialsPage.jsx";
@@ -27,6 +28,7 @@ export default function App() {
         {/* Public */}
         <Route path="/"         element={<HomePage />} />
         <Route path="/login"    element={isAuth ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/register" element={isAuth ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
 

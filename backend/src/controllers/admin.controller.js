@@ -17,7 +17,7 @@ const requireAdmin = (req, res, next) => {
 
 export const getDashboardStats = catchAsync(async (req, res, next) => {
   requireAdmin(req, next);
-   if (!requireAdmin(req, res, next)) return;
+  if (!requireAdmin(req, res, next)) return;
 
   const [
     totalStudents,
@@ -41,20 +41,23 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
     // 5: filesByCategory (Groups by category, counts them, and sums file size)
     Material.aggregate([
       { $match: { isDeleted: false } },
-      { $group: { _id: "$category", count: { $sum: 1 }, totalSize: { $sum: "$fileSize" } } }
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          totalSize: { $sum: "$fileSize" },
+        },
+      },
     ]),
 
     // 6: filesByDept (Groups materials by department)
     Material.aggregate([
       { $match: { isDeleted: false } },
-      { $group: { _id: "$dept", count: { $sum: 1 } } }
+      { $group: { _id: "$dept", count: { $sum: 1 } } },
     ]),
 
     // 7: recentFiles (Fetches the 5 newest files)
-    Material.find({ isDeleted: false })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean(),
+    Material.find({ isDeleted: false }).sort({ createdAt: -1 }).limit(5).lean(),
 
     // 8: crBlock (Fetches a preview of 5 CRs)
     User.find({ role: "CR", isActive: true })
@@ -63,19 +66,22 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
       .lean(),
 
     // 9: activeUsers (Counts users seen in the last 15 minutes)
-    User.countDocuments({ 
-      lastSeen: { $gte: new Date(Date.now() - 15 * 60 * 1000) } 
+    User.countDocuments({
+      lastSeen: { $gte: new Date(Date.now() - 15 * 60 * 1000) },
     }),
 
     // 10-11: Folders
     SubjectFolder.countDocuments({ isActive: true }),
     SubjectFolder.aggregate([
       { $match: { isActive: true } },
-      { $group: { _id: "$dept", count: { $sum: 1 } } }
+      { $group: { _id: "$dept", count: { $sum: 1 } } },
     ]),
-  ])
+  ]);
 
-  const totalStorageBytes = filesByCategory.reduce((acc, c) => acc + (c.totalSize || 0), 0);
+  const totalStorageBytes = filesByCategory.reduce(
+    (acc, c) => acc + (c.totalSize || 0),
+    0,
+  );
   const totalStorageMB = (totalStorageBytes / (1024 * 1024)).toFixed(2);
 
   res.status(200).json({
@@ -99,18 +105,26 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
         viewAllUrl: "/api/admin/users?role=CR",
       },
       folders: {
-  totalFolders,
-  byDept: foldersByDept,
-},
+        totalFolders,
+        byDept: foldersByDept,
+      },
     },
   });
 });
 
-
 export const getUsers = catchAsync(async (req, res, next) => {
   requireAdmin(req, next);
 
-  const { role, dept, level, term, batch, page = 1, limit = 20, search } = req.query;
+  const {
+    role,
+    dept,
+    level,
+    term,
+    batch,
+    page = 1,
+    limit = 20,
+    search,
+  } = req.query;
   const filter = { isActive: true };
 
   if (role) filter.role = role;
@@ -128,7 +142,11 @@ export const getUsers = catchAsync(async (req, res, next) => {
 
   const skip = (Number(page) - 1) * Number(limit);
   const [users, total] = await Promise.all([
-    User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+    User.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean(),
     User.countDocuments(filter),
   ]);
 
@@ -142,7 +160,6 @@ export const getUsers = catchAsync(async (req, res, next) => {
   });
 });
 
-
 export const updateUserRole = catchAsync(async (req, res, next) => {
   requireAdmin(req, next);
 
@@ -150,23 +167,50 @@ export const updateUserRole = catchAsync(async (req, res, next) => {
   const VALID_ROLES = ["Student", "CR", "Teacher", "Admin", "SuperAdmin"];
 
   if (!VALID_ROLES.includes(newRole)) {
-    return next(new AppError(`Invalid role. Valid roles: ${VALID_ROLES.join(", ")}`, 400));
+    return next(
+      new AppError(`Invalid role. Valid roles: ${VALID_ROLES.join(", ")}`, 400),
+    );
   }
 
   // Admins cannot promote to Admin / SuperAdmin
   if (req.user.role === "Admin" && ["Admin", "SuperAdmin"].includes(newRole)) {
-    return next(new AppError("Only SuperAdmins can assign Admin or SuperAdmin roles.", 403));
+    return next(
+      new AppError(
+        "Only SuperAdmins can assign Admin or SuperAdmin roles.",
+        403,
+      ),
+    );
+  }
+
+  if (newRole === "SuperAdmin" && req.user.role !== "SuperAdmin") {
+    return next(
+      new AppError("Only SuperAdmins can assign the SuperAdmin role.", 403),
+    );
+  }
+  if (newRole === "Admin" && req.user.role === "Admin") {
+    return next(
+      new AppError(
+        "Admins cannot promote others to Admin. Only SuperAdmin can.",
+        403,
+      ),
+    );
   }
 
   const user = await User.findByIdAndUpdate(
     req.params.id,
     { role: newRole },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (!user) return next(new AppError("User not found.", 404));
 
-  res.status(200).json({ success: true, message: `User role updated to ${newRole}.`, data: user });
+  res
+    .status(200)
+    .json({
+      success: true,
+      message: `User role updated to ${newRole}.`,
+      data: user,
+    });
 });
 
 export const deactivateUser = catchAsync(async (req, res, next) => {
@@ -175,19 +219,20 @@ export const deactivateUser = catchAsync(async (req, res, next) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
     { isActive: false },
-    { new: true }
+    { new: true },
   );
   if (!user) return next(new AppError("User not found.", 404));
 
-  res.status(200).json({ success: true, message: "User deactivated.", data: user });
+  res
+    .status(200)
+    .json({ success: true, message: "User deactivated.", data: user });
 });
 
 export const adminRegisterUser = catchAsync(async (req, res, next) => {
   requireAdmin(req, next);
 
-  const {
-    studentId, email, name, dept, level, term, session, batch, role,
-  } = req.body;
+  const { studentId, email, name, dept, level, term, session, batch, role } =
+    req.body;
 
   const rawPassword = `${studentId.slice(-4)}@Campus${Math.floor(Math.random() * 900 + 100)}`;
 
@@ -295,13 +340,22 @@ export const adminDeleteFolder = catchAsync(async (req, res, next) => {
 export const adminGetMaterials = catchAsync(async (req, res, next) => {
   requireAdmin(req, next);
 
-  const { dept, level, term, category, courseCode, page = 1, limit = 20, search } = req.query;
+  const {
+    dept,
+    level,
+    term,
+    category,
+    courseCode,
+    page = 1,
+    limit = 20,
+    search,
+  } = req.query;
 
   const filter = { isDeleted: false };
-  if (dept)       filter.dept = dept.toUpperCase();
-  if (level)      filter.level = Number(level);
-  if (term)       filter.term = Number(term);
-  if (category)   filter.category = category;
+  if (dept) filter.dept = dept.toUpperCase();
+  if (level) filter.level = Number(level);
+  if (term) filter.term = Number(term);
+  if (category) filter.category = category;
   if (courseCode) filter.courseCode = courseCode.toUpperCase();
   if (search) {
     filter.$or = [
