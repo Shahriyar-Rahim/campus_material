@@ -1,6 +1,6 @@
 # Campus Materials Portal
 
-![Campus Materials Portal Screenshot](asset/screenshot.png)
+![Campus Materials Portal Screenshot](asset/image.png)
 
 A comprehensive campus materials management platform designed to streamline the sharing, organization, and access to educational resources. This full-stack application enables students and faculty to efficiently manage course materials, assignments, and collaborative content.
 
