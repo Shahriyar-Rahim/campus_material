@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 
 export default function ProfilePage() {
   const user = useSelector(selectCurrentUser);
+  const token = useSelector((state) => state.auth.token);
   const dispatch = useDispatch();
   const fileRef = useRef(null);
 
