@@ -11,39 +11,32 @@ const MANAGER_ROLES = ["CR", "Teacher", "Admin", "SuperAdmin"];
 const canManage = (role) => MANAGER_ROLES.includes(role);
 
 export const getMaterials = catchAsync(async (req, res, next) => {
-  const {
-    dept,
-    level,
-    term,
-    category,
-    courseCode,
-    page = 1,
-    limit = 20,
-  } = req.query;
+  const { dept, level, term, session, category, courseCode, page = 1, limit = 20 } = req.query;
 
   if (!dept || !level || !term) {
-    return next(
-      new AppError("dept, level, and term are required query params.", 400),
-    );
+    return next(new AppError("dept, level, and term are required.", 400));
   }
 
+  // Session isolation — default to user's session
+  const targetSession = session || req.user?.session;
+
   const filter = {
-    dept: dept.toUpperCase(),
-    level: Number(level),
-    term: Number(term),
+    dept:      dept.toUpperCase(),
+    level:     Number(level),
+    term:      Number(term),
     isVisible: true,
     isDeleted: false,
+    ...(targetSession && { session: targetSession }),
   };
-  if (category) filter.category = category;
-  if (courseCode)
-    filter.courseCode = decodeURIComponent(courseCode).toUpperCase();
+
+  if (category)   filter.category   = category;
+  if (courseCode) filter.courseCode = decodeURIComponent(courseCode).toUpperCase();
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const [materials, total] = await Promise.all([
     Material.find(filter)
       .populate("uploadedBy", "name role studentId")
-      .populate("pinnedBy", "name role")
       .sort({ isPinned: -1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
@@ -116,7 +109,7 @@ export const uploadMaterial = catchAsync(async (req, res, next) => {
     dept: dept.toUpperCase(),
     level: Number(level),
     term: Number(term),
-    session: session || null,
+    session: session || req.user.session,
     year: Number(year) || new Date().getFullYear(),
     uploadedBy: req.user._id,
     uploaderRole: req.user.role,

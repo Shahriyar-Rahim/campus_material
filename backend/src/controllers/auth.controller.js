@@ -57,7 +57,7 @@ const uploadToCloudinary = (buffer, publicId) =>
 export const register = catchAsync(async (req, res, next) => {
   const { studentId, email, name, dept, level, term, session, batch, password } = req.body;
 
-  if (!studentId || !email || !name || !dept || !level || !term || !session || !batch || !password) {
+  if (!studentId || !email || !name || !dept || !level || !term || !batch || !password) { //!session ||
     return next(new AppError("All fields are required for registration.", 400));
   }
 
@@ -67,6 +67,23 @@ export const register = catchAsync(async (req, res, next) => {
     return next(new AppError(`${field} is already registered.`, 409));
   }
 
+  let assignedSession = session || null;
+  if (!assignedSession) {
+    const Session = (await import("../models/Session.model.js")).default;
+    const activeSession = await Session.findOne({
+      isActive: true,
+      sections: {
+        $elemMatch: {
+          dept:  dept.toUpperCase(),
+          level: Number(level),
+          term:  Number(term),
+        },
+      },
+    }).sort({ createdAt: -1 }).lean();
+
+    assignedSession = activeSession?.name || null;
+  }
+
   const user = await User.create({
     studentId,
     email,
@@ -74,7 +91,7 @@ export const register = catchAsync(async (req, res, next) => {
     dept,
     level: Number(level),
     term: Number(term),
-    session,
+    session: assignedSession,
     batch,
     password,
     role: "Student",
@@ -90,7 +107,7 @@ export const register = catchAsync(async (req, res, next) => {
     level,
     term,
     batch,
-    session,
+    session : assignedSession,
     role: "Student",
   }).catch((err) => console.error("[Email] Welcome email failed:", err.message));
 
@@ -320,7 +337,7 @@ export const updateProfile = catchAsync(async (req, res, next) => {
   }
 
   // Support 'session' properties inside permitted payload attributes whitelist
-  const allowedUpdates = ["name", "level", "term", "session"];
+  const allowedUpdates = ["name", "level", "term", "session", "sessionDuration"];
   const updates = {};
   allowedUpdates.forEach((f) => {
     if (req.body[f] !== undefined) updates[f] = req.body[f];

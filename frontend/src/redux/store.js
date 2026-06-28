@@ -23,6 +23,7 @@ import { plannerApi } from "./api/plannerApi";
 import { routineApi } from "./api/routineApi";
 import { foldersApi } from "./api/foldersApi";
 import { requestsApi } from "./api/requestsApi";
+import { sessionsApi } from "./api/sessionsApi";
 
 const authPersistConfig = {
   key: "campus-auth",
@@ -37,6 +38,7 @@ const rootReducer = combineReducers({
   [routineApi.reducerPath]: routineApi.reducer,
   [foldersApi.reducerPath]: foldersApi.reducer,
   [requestsApi.reducerPath]: requestsApi.reducer,
+  [sessionsApi.reducerPath]: sessionsApi.reducer,
 });
 
 export const store = configureStore({
@@ -53,7 +55,8 @@ export const store = configureStore({
       routineApi.middleware,
       foldersApi.middleware,
       requestsApi.middleware,
-    ]), // Passing as an array is cleaner
+      sessionsApi.middleware,
+    ]),
   devTools: import.meta.env.MODE !== "production",
 });
 export const persistor = persistStore(store);

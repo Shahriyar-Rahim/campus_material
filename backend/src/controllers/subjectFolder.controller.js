@@ -6,29 +6,38 @@ import AppError from "../utils/AppError.js";
 const MANAGER_ROLES = ["CR", "Teacher", "Admin", "SuperAdmin"];
 
 export const getFolders = catchAsync(async (req, res, next) => {
-  const { dept, level, term } = req.query;
+  const { dept, level, term, session } = req.query;
 
   if (!dept || !level || !term) {
     return next(new AppError("dept, level, and term are required.", 400));
   }
 
-  const folders = await SubjectFolder.find({
+  // If no session provided, use the requesting user's session
+  const targetSession = session || req.user?.session;
+
+  const filter = {
     dept: dept.toUpperCase(),
     level: Number(level),
-    term: Number(term),
+    term:  Number(term),
     isActive: true,
-  })
+    isRootFolder: true,
+    // Session isolation: only show this session's folders
+    ...(targetSession && { session: targetSession }),
+  };
+
+  const folders = await SubjectFolder.find(filter)
     .populate("createdBy", "name role")
     .sort({ isPinned: -1, courseCode: 1 })
     .lean();
 
-  // Attach live material counts
+  // Attach live material counts in one aggregation
   const counts = await Material.aggregate([
     {
       $match: {
         dept: dept.toUpperCase(),
         level: Number(level),
-        term: Number(term),
+        term:  Number(term),
+        session: targetSession || { $exists: true },
         isDeleted: false,
         courseCode: { $in: folders.map((f) => f.courseCode) },
       },
@@ -39,15 +48,10 @@ export const getFolders = catchAsync(async (req, res, next) => {
   const countMap = {};
   counts.forEach((c) => { countMap[c._id] = c.count; });
 
-  const enriched = folders.map((f) => ({
-    ...f,
-    materialCount: countMap[f.courseCode] || 0,
-  }));
-
   res.status(200).json({
     success: true,
-    count: enriched.length,
-    data: enriched,
+    count: folders.length,
+    data: folders.map((f) => ({ ...f, materialCount: countMap[f.courseCode] || 0 })),
   });
 });
 
@@ -85,30 +89,28 @@ export const getAllFoldersByDept = catchAsync(async (req, res, next) => {
 
 export const createFolder = catchAsync(async (req, res, next) => {
   if (!MANAGER_ROLES.includes(req.user.role)) {
-    return next(new AppError("Only CRs, Teachers, and Admins can create folders.", 403));
+    return next(new AppError("Permission denied.", 403));
   }
 
   const {
     courseCode, courseName, courseDescription,
-    dept, level, term, creditHours, courseType,
+    dept, level, term, session,
+    creditHours, courseType,
   } = req.body;
 
-  if (!courseCode || !courseName || !dept || !level || !term) {
-    return next(
-      new AppError("courseCode, courseName, dept, level, and term are required.", 400)
-    );
+  if (!courseCode || !courseName || !dept || !level || !term || !session) {
+    return next(new AppError("courseCode, courseName, dept, level, term, session are required.", 400));
   }
 
-  // CRs can only create folders for their own section
+  // CRs locked to their own section AND session
   if (req.user.role === "CR") {
     if (
       dept.toUpperCase() !== req.user.dept ||
       Number(level) !== req.user.level ||
-      Number(term) !== req.user.term
+      Number(term)  !== req.user.term  ||
+      session       !== req.user.session
     ) {
-      return next(
-        new AppError("CRs can only create folders for their own dept/level/term.", 403)
-      );
+      return next(new AppError("CRs can only create folders for their own section and session.", 403));
     }
   }
 
@@ -118,20 +120,17 @@ export const createFolder = catchAsync(async (req, res, next) => {
     courseDescription: courseDescription || "",
     dept: dept.toUpperCase(),
     level: Number(level),
-    term: Number(term),
-    creditHours: creditHours || 3,
-    courseType: courseType || "Theory",
-    createdBy: req.user._id,
-    creatorRole: req.user.role,
+    term:  Number(term),
+    session,
+    creditHours:  creditHours  || 3,
+    courseType:   courseType   || "Theory",
+    createdBy:    req.user._id,
+    creatorRole:  req.user.role,
   });
 
   await folder.populate("createdBy", "name role");
 
-  res.status(201).json({
-    success: true,
-    message: "Subject folder created.",
-    data: folder,
-  });
+  res.status(201).json({ success: true, data: folder });
 });
 
 export const updateFolder = catchAsync(async (req, res, next) => {

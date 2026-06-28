@@ -82,7 +82,7 @@ export const sendWelcomeEmail = async ({
         </div>
         <div class="cred-row">
           <span class="cred-label">Session: </span>
-          <span class="cred-value">${session}</span>
+          <span class="cred-value">${session || "Not assigned"}</span>
         </div>
         <div class="cred-row">
           <span class="cred-label">Role: </span>
@@ -128,7 +128,12 @@ export const sendWelcomeEmail = async ({
 //   });
 // };
 
-export const sendNudgeEmail = async ({ to, targetName, senderName, courseCode }) => {
+export const sendNudgeEmail = async ({
+  to,
+  targetName,
+  senderName,
+  courseCode,
+}) => {
   const transporter = createTransporter();
 
   const html = `

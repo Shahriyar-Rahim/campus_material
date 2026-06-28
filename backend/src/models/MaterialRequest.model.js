@@ -24,6 +24,7 @@ const materialRequestSchema = new mongoose.Schema(
     dept:  { type: String, uppercase: true, required: true },
     level: { type: Number, required: true },
     term:  { type: Number, required: true },
+    session: { type: String, required: false, default: "Unassigned", index: true },
 
     status: {
       type: String,

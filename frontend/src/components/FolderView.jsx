@@ -487,6 +487,7 @@ export default function FolderView({
   dept,
   level,
   term,
+  session,
 }) {
   const currentUser = useSelector(selectCurrentUser);
   const fileInputRef = useRef(null);
@@ -505,7 +506,7 @@ export default function FolderView({
 
   // RTK Query
   const { data, isLoading, isError, refetch } = useGetMaterialsQuery(
-    { dept, level, term, category, courseCode },
+    { dept, level, term, category, courseCode , session },
     { skip: !dept || !level || !term },
   );
 
@@ -559,6 +560,7 @@ export default function FolderView({
     formData.append("dept", dept);
     formData.append("level", String(level));
     formData.append("term", String(term));
+    formData.append("session", session || "");
 
     const result = await uploadMaterial(formData);
     if (!result.error) clearFile();

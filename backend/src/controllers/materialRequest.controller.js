@@ -27,6 +27,7 @@ export const createRequest = catchAsync(async (req, res, next) => {
     dept:  req.user.dept,
     level: req.user.level,
     term:  req.user.term,
+    session: req.user.session || "Unassigned",
   });
 
   await request.populate("requestedBy", "name studentId dept level term email");

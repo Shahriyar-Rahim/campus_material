@@ -17,6 +17,7 @@ import AdminPage       from "../src/pages/Admin/AdminPage.jsx";
 import ProfilePage     from "../src/pages/Dashboard/ProfilePage.jsx";
 import UnauthorizedPage from "../src/pages/Auth/UnauthorizedPage.jsx";
 import NotFoundPage    from "../src/pages/Home/NotFoundPage.jsx";
+import RoutinePage from "../src/pages/Dashboard/RoutinePage.jsx";
 
 export default function App() {
   const isAuth = useSelector(selectIsAuth);
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/materials/:courseCode"  element={<MaterialsPage />} />
           <Route path="/planner"                element={<PlannerPage />} />
           <Route path="/profile"                element={<ProfilePage />} />
+          <Route path="/routine" element={<RoutinePage />} />
         </Route>
 
         {/* Protected — Admin / SuperAdmin only */}

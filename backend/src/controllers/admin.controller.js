@@ -6,6 +6,7 @@ import AppError from "../utils/AppError.js";
 import { sendWelcomeEmail } from "../services/email.service.js";
 import SubjectFolder from "../models/SubjectFolder.model.js";
 import supabase from "../config/supabase.js";
+import Session from "../models/Session.model.js";
 
 const requireAdmin = (req, res, next) => {
   if (!["Admin", "SuperAdmin"].includes(req.user.role)) {
@@ -16,7 +17,6 @@ const requireAdmin = (req, res, next) => {
 };
 
 export const getDashboardStats = catchAsync(async (req, res, next) => {
-  requireAdmin(req, next);
   if (!requireAdmin(req, res, next)) return;
 
   const [
@@ -32,67 +32,57 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
     totalFolders,
     foldersByDept,
   ] = await Promise.all([
-    // 1-4: Basic Counts
     User.countDocuments({ role: "Student", isActive: true }),
-    User.countDocuments({ role: "CR", isActive: true }),
+    User.countDocuments({ role: "CR",      isActive: true }),
     User.countDocuments({ role: "Teacher", isActive: true }),
     Material.countDocuments({ isDeleted: false }),
 
-    // 5: filesByCategory (Groups by category, counts them, and sums file size)
     Material.aggregate([
       { $match: { isDeleted: false } },
-      {
-        $group: {
-          _id: "$category",
-          count: { $sum: 1 },
-          totalSize: { $sum: "$fileSize" },
-        },
-      },
+      { $group: { _id: "$category", count: { $sum: 1 }, totalSize: { $sum: "$fileSize" } } },
+      { $sort: { count: -1 } },
     ]),
 
-    // 6: filesByDept (Groups materials by department)
     Material.aggregate([
       { $match: { isDeleted: false } },
       { $group: { _id: "$dept", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
     ]),
 
-    // 7: recentFiles (Fetches the 5 newest files)
-    Material.find({ isDeleted: false }).sort({ createdAt: -1 }).limit(5).lean(),
+    Material.find({ isDeleted: false })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select("title category dept level term courseCode fileName fileSize supabaseUrl createdAt uploadedBy")
+      .populate("uploadedBy", "name role")
+      .lean(),
 
-    // 8: crBlock (Fetches a preview of 5 CRs)
     User.find({ role: "CR", isActive: true })
       .select("name studentId dept email")
       .limit(5)
       .lean(),
 
-    // 9: activeUsers (Counts users seen in the last 15 minutes)
     User.countDocuments({
       lastSeen: { $gte: new Date(Date.now() - 15 * 60 * 1000) },
     }),
 
-    // 10-11: Folders
     SubjectFolder.countDocuments({ isActive: true }),
+
     SubjectFolder.aggregate([
       { $match: { isActive: true } },
       { $group: { _id: "$dept", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
     ]),
   ]);
 
   const totalStorageBytes = filesByCategory.reduce(
-    (acc, c) => acc + (c.totalSize || 0),
-    0,
+    (acc, c) => acc + (c.totalSize || 0), 0
   );
   const totalStorageMB = (totalStorageBytes / (1024 * 1024)).toFixed(2);
 
   res.status(200).json({
     success: true,
     data: {
-      users: {
-        totalStudents,
-        totalCRs,
-        totalTeachers,
-        activeUsers,
-      },
+      users: { totalStudents, totalCRs, totalTeachers, activeUsers },
       materials: {
         totalFiles,
         totalStorageMB: Number(totalStorageMB),
@@ -104,10 +94,7 @@ export const getDashboardStats = catchAsync(async (req, res, next) => {
         preview: crBlock,
         viewAllUrl: "/api/admin/users?role=CR",
       },
-      folders: {
-        totalFolders,
-        byDept: foldersByDept,
-      },
+      folders: { totalFolders, byDept: foldersByDept },
     },
   });
 });
@@ -204,13 +191,11 @@ export const updateUserRole = catchAsync(async (req, res, next) => {
 
   if (!user) return next(new AppError("User not found.", 404));
 
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: `User role updated to ${newRole}.`,
-      data: user,
-    });
+  res.status(200).json({
+    success: true,
+    message: `User role updated to ${newRole}.`,
+    data: user,
+  });
 });
 
 export const deactivateUser = catchAsync(async (req, res, next) => {
@@ -234,6 +219,22 @@ export const adminRegisterUser = catchAsync(async (req, res, next) => {
   const { studentId, email, name, dept, level, term, session, batch, role } =
     req.body;
 
+    let assignedSession = session;
+  if (!assignedSession) {
+    const activeSession = await Session.findOne({
+      isActive: true,
+      sections: {
+        $elemMatch: {
+          dept:  dept.toUpperCase(),
+          level: Number(level),
+          term:  Number(term),
+        },
+      },
+    }).sort({ createdAt: -1 }).lean();
+
+    assignedSession = activeSession?.name || null;
+  }
+
   const rawPassword = `${studentId.slice(-4)}@Campus${Math.floor(Math.random() * 900 + 100)}`;
 
   const newUser = await User.create({
@@ -241,9 +242,9 @@ export const adminRegisterUser = catchAsync(async (req, res, next) => {
     email,
     name,
     dept,
-    level,
-    term,
-    session,
+    level:   Number(level),
+    term:    Number(term),
+    session :assignedSession,
     batch,
     role: role || "Student",
     password: rawPassword,
@@ -259,8 +260,8 @@ export const adminRegisterUser = catchAsync(async (req, res, next) => {
     dept,
     level,
     term,
+    session: assignedSession,
     batch,
-    session,
     role: role || "Student",
   });
 

@@ -43,6 +43,13 @@ const subjectFolderSchema = new mongoose.Schema(
       max: 2,
       index: true,
     },
+    session: {
+      type: String,
+      required: [true, "Session is required"],
+      trim: true,
+      index: true,
+      // e.g. "Winter 2026", "Summer 2026"
+    },
     creditHours: {
       type: Number,
       default: 3,
@@ -107,11 +114,11 @@ const subjectFolderSchema = new mongoose.Schema(
 );
 
 subjectFolderSchema.index(
-  { courseCode: 1, dept: 1, level: 1, term: 1, parentFolder: 1 },
-  { unique: true }
+  { courseCode: 1, dept: 1, level: 1, term: 1, session: 1, parentFolder: 1 },
+  { unique: true },
 );
 
-subjectFolderSchema.index({ dept: 1, level: 1, term: 1, isActive: 1 });
+subjectFolderSchema.index({ dept: 1, level: 1, term: 1, session: 1, isActive: 1 });
 
 subjectFolderSchema.virtual("folderLabel").get(function () {
   return `${this.dept} L${this.level}T${this.term} — ${this.courseCode}`;

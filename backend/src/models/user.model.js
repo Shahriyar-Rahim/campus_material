@@ -75,6 +75,11 @@ const userSchema = new mongoose.Schema({
       "Session must be in format 'SEASON YYYY' (e.g., SUMMER 2026)",
     ],
   },
+  sessionDuration: {
+  // How long this session lasts — user-defined
+  startDate: { type: Date, default: null },
+  endDate:   { type: Date, default: null },
+},
   batch: {
     type: String,
     required: [true, "Batch is required"],

@@ -93,7 +93,9 @@ const materialSchema = new mongoose.Schema(
     },
     session: {
       type: String,
-      default: null,
+      required: [true, "Session is required"],
+      index: true,
+      trim: true,
     },
     year: {
       type: Number,
@@ -175,13 +177,13 @@ const materialSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
-materialSchema.index({ dept: 1, level: 1, term: 1, category: 1 });
-materialSchema.index({ courseCode: 1, category: 1 });
-materialSchema.index({ isPinned: -1, createdAt: -1 });
-materialSchema.index({ isDeleted: 1, isVisible: 1 });
+materialSchema.index({ dept: 1, level: 1, term: 1, session: 1, category: 1 });
+materialSchema.index({ courseCode: 1, session: 1, isDeleted: 1 });
+materialSchema.index({ uploadedBy: 1, createdAt: -1 });
+materialSchema.index({ isPinned: -1, createdAt: -1, isDeleted: 1 });
 
 materialSchema.virtual("folderLabel").get(function () {
   return `${this.dept}/L${this.level}T${this.term}/${this.category}`;
@@ -201,7 +203,7 @@ materialSchema.pre(/^find/, function () {
   if (!options || !options._includeDeleted) {
     this.where({ isDeleted: false });
   }
-})
+});
 
 const Material = mongoose.model("Material", materialSchema);
 export default Material;

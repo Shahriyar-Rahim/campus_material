@@ -8,7 +8,7 @@ import {
   ErrorComp,
   Badge,
 } from "../../components/ui/index.jsx";
-import { cn } from "../../utils/cn"
+import { cn } from "../../utils/cn";
 import toast from "react-hot-toast";
 
 function useAdminData(endpoint) {
@@ -167,6 +167,181 @@ function UserRow({ user, onRoleChange, onDeactivate }) {
   );
 }
 
+function SessionCard({ sess, token, onToggle }) {
+  const [expanded, setExpanded] = useState(false);
+  const [content, setContent] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchContent = async () => {
+    if (content) {
+      setExpanded((e) => !e);
+      return;
+    } // already fetched
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/sessions/${sess._id}/content`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message);
+      setContent(json.data);
+      setExpanded(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "card overflow-hidden transition-all",
+        sess.isActive ? "border-green-200" : "border-gray-200 opacity-70",
+      )}
+    >
+      {/* Session header row */}
+      <div className="flex items-center gap-3 p-4">
+        <button
+          onClick={fetchContent}
+          className="flex flex-1 items-center gap-3 text-left"
+        >
+          <span className="text-xl">{expanded ? "📂" : "📁"}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-gray-900">{sess.name}</p>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  sess.isActive
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-500",
+                )}
+              >
+                {sess.isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">
+              {sess.type} {sess.year}
+              {content &&
+                ` · ${content.summary.totalFolders} folders · ${content.summary.totalMaterials} files · ${content.summary.depts.join(", ")}`}
+            </p>
+          </div>
+          {loading ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          ) : (
+            <span className="text-gray-400 text-sm">
+              {expanded ? "▲" : "▼"}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => onToggle(sess._id, sess.isActive)}
+          className={cn(
+            "shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+            sess.isActive
+              ? "border-red-200 text-red-600 hover:bg-red-50"
+              : "border-green-200 text-green-600 hover:bg-green-50",
+          )}
+        >
+          {sess.isActive ? "Deactivate" : "Activate"}
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mx-4 mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      {/* Expanded content — grouped by dept → level/term → folders */}
+      {expanded && content && (
+        <div className="border-t border-gray-100 p-4">
+          {/* Summary strip */}
+          <div className="mb-4 flex flex-wrap gap-3">
+            {[
+              { label: "Folders", value: content.summary.totalFolders },
+              { label: "Files", value: content.summary.totalMaterials },
+              {
+                label: "Storage",
+                value: `${(content.summary.totalSizeKB / 1024).toFixed(1)} MB`,
+              },
+              { label: "Depts", value: content.summary.depts.length },
+              { label: "Sections", value: content.summary.sections.length },
+            ].map(({ label, value }) => (
+              <div
+                key={label}
+                className="rounded-lg bg-gray-50 px-4 py-2 text-center"
+              >
+                <p className="text-lg font-bold text-gray-900">{value}</p>
+                <p className="text-xs text-gray-500">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Grouped by dept */}
+          {Object.keys(content.grouped).length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-400">
+              No folders exist for this session yet.
+            </p>
+          ) : (
+            Object.entries(content.grouped).map(([dept, sections]) => (
+              <div key={dept} className="mb-5">
+                {/* Dept heading */}
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="rounded-lg bg-blue-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                    {dept}
+                  </span>
+                  <div className="flex-1 border-t border-gray-100" />
+                </div>
+
+                {/* Sections */}
+                {Object.entries(sections).map(([sectionKey, section]) => (
+                  <div key={sectionKey} className="mb-3 ml-3">
+                    <p className="mb-1.5 text-xs font-semibold text-gray-500">
+                      Level {section.level} — Term {section.term}
+                    </p>
+
+                    {/* Folder chips */}
+                    <div className="flex flex-wrap gap-2">
+                      {section.folders.map((folder) => (
+                        <div
+                          key={folder._id}
+                          className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2"
+                        >
+                          <span className="text-sm">📁</span>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900">
+                              {folder.courseCode}
+                            </p>
+                            <p className="text-[10px] text-gray-400">
+                              {folder.courseName}
+                              {folder.materialCount > 0 &&
+                                ` · ${folder.materialCount} files`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const token = useSelector(selectToken);
@@ -194,6 +369,23 @@ export default function AdminPage() {
   const [replyModal, setReplyModal] = useState(null); // request being replied to
   const [replyText, setReplyText] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
+  const [sessionsList, setSessionsList] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [newSession, setNewSession] = useState({
+    name: "",
+    type: "Summer",
+    year: new Date().getFullYear(),
+  });
+  const [sessionError, setSessionError] = useState("");
+  const [routineFilter, setRoutineFilter] = useState({
+    dept: "",
+    level: "",
+    term: "",
+    session: "",
+  });
+  const [routineData, setRoutineData] = useState(null);
+  const [routineLoading, setRoutineLoading] = useState(false);
+  const [routineEntries, setRoutineEntries] = useState([]);
 
   const fetchMaterials = async (filter = matFilter, page = 1) => {
     setMaterialsLoading(true);
@@ -283,6 +475,7 @@ export default function AdminPage() {
 
   const handleTabChange = (t) => {
     setTab(t);
+    if (t === "sessions" && sessionsList.length === 0) fetchSessionsList();
     if (t === "dashboard" && !stats) fetchStats();
     if (t === "users" && users.length === 0) fetchUsers();
     if (t === "materials" && materials.length === 0) fetchMaterials();
@@ -423,12 +616,104 @@ export default function AdminPage() {
     }
   };
 
+  const fetchSessionsList = async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (res.ok) setSessionsList(json.data);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const fetchRoutineAdmin = async () => {
+  if (!routineFilter.dept || !routineFilter.level || !routineFilter.term) return;
+  setRoutineLoading(true);
+  try {
+    const params = new URLSearchParams({
+      dept:  routineFilter.dept,
+      level: routineFilter.level,
+      term:  routineFilter.term,
+    });
+    if (routineFilter.session) params.set("session", routineFilter.session);
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/routine?${params}`,
+      { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+    );
+    const json = await res.json();
+    if (res.ok) { setRoutineData(json.data); setRoutineEntries(json.data?.schedule || []); }
+    else toast.error(json.message || "Failed to load routine.");
+  } finally {
+    setRoutineLoading(false);
+  }
+};
+
+  const handleCreateSession = async (e) => {
+    e.preventDefault();
+    setSessionError("");
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        ...newSession,
+        year: Number(newSession.year),
+      }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      toast.success("Session created.");
+      setSessionsList((s) => [json.data, ...s]);
+      setNewSession({
+        name: "",
+        type: "Summer",
+        year: new Date().getFullYear(),
+      });
+    } else {
+      setSessionError(json.message || "Failed.");
+    }
+  };
+
+  const handleToggleSession = async (id, isActive) => {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/sessions/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: "include",
+      body: JSON.stringify({ isActive: !isActive }),
+    });
+    if (res.ok) {
+      setSessionsList((s) =>
+        s.map((sess) =>
+          sess._id === id ? { ...sess, isActive: !isActive } : sess,
+        ),
+      );
+      toast.success(`Session ${!isActive ? "activated" : "deactivated"}.`);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <h1 className="mb-6 text-xl font-bold text-gray-900">Admin Dashboard</h1>
 
       {/* Tabs */}
-      {["dashboard", "users", "materials", "requests"].map((t) => (
+      {[
+        "sessions",
+        "dashboard",
+        "users",
+        "materials",
+        "requests",
+        "routine",
+      ].map((t) => (
         <button
           key={t}
           onClick={() => handleTabChange(t)}
@@ -442,6 +727,103 @@ export default function AdminPage() {
         </button>
       ))}
 
+      {/* Session */}
+      {tab === "sessions" && (
+        <div className="mt-6 space-y-6">
+          {/* Create session form */}
+          <div className="card p-5">
+            <h3 className="mb-4 font-semibold text-gray-900">
+              Create New Session
+            </h3>
+            {sessionError && (
+              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {sessionError}
+              </div>
+            )}
+            <form
+              onSubmit={handleCreateSession}
+              className="flex flex-wrap items-end gap-3"
+            >
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Name *
+                </label>
+                <input
+                  value={newSession.name}
+                  onChange={(e) =>
+                    setNewSession((s) => ({ ...s, name: e.target.value }))
+                  }
+                  placeholder="e.g. Winter 2026"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none w-44"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Type
+                </label>
+                <select
+                  value={newSession.type}
+                  onChange={(e) =>
+                    setNewSession((s) => ({ ...s, type: e.target.value }))
+                  }
+                  className="rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none"
+                >
+                  {["Summer", "Winter", "Fall", "Spring"].map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Year
+                </label>
+                <input
+                  type="number"
+                  value={newSession.year}
+                  onChange={(e) =>
+                    setNewSession((s) => ({ ...s, year: e.target.value }))
+                  }
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none w-24"
+                  min="2020"
+                  max="2040"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Create
+              </button>
+            </form>
+          </div>
+
+          {/* Sessions list + content viewer */}
+          <div>
+            <h3 className="mb-3 font-semibold text-gray-900">All Sessions</h3>
+            {sessionsLoading ? (
+              <div className="h-20 animate-pulse rounded-xl bg-gray-100" />
+            ) : sessionsList.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                No sessions yet. Create one above.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sessionsList.map((sess) => (
+                  <SessionCard
+                    key={sess._id}
+                    sess={sess}
+                    token={token}
+                    onToggle={handleToggleSession}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Dashboard tab */}
       {tab === "dashboard" &&
         (statsLoading ? (
@@ -818,176 +1200,386 @@ export default function AdminPage() {
       )}
       {/* Request Tabn */}
       {tab === "requests" && (
-  <div>
-    {/* Filter bar */}
-    <div className="mb-4 flex items-center gap-3">
-      {["", "Pending", "InProgress", "Fulfilled", "Declined"].map((s) => (
-        <button key={s}
-          onClick={() => { setReqStatusFilter(s); fetchRequests(s); }}
-          className={cn(
-            "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-            reqStatusFilter === s
-              ? "border-blue-500 bg-blue-50 text-blue-700"
-              : "border-gray-200 text-gray-500 hover:border-gray-300"
+        <div>
+          {/* Filter bar */}
+          <div className="mb-4 flex items-center gap-3">
+            {["", "Pending", "InProgress", "Fulfilled", "Declined"].map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setReqStatusFilter(s);
+                  fetchRequests(s);
+                }}
+                className={cn(
+                  "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                  reqStatusFilter === s
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300",
+                )}
+              >
+                {s || "All"}
+              </button>
+            ))}
+            <span className="ml-auto text-sm text-gray-500">
+              {requestsTotal} requests
+            </span>
+          </div>
+
+          {requestsLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.length === 0 && (
+                <div className="py-10 text-center text-sm text-gray-400">
+                  No requests found.
+                </div>
+              )}
+              {requests.map((req) => (
+                <div key={req._id} className="card p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {req.requestedBy?.name?.[0]?.toUpperCase()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      {/* Header */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-gray-900">
+                          {req.requestedBy?.name}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {req.requestedBy?.studentId}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {req.dept} L{req.level}T{req.term}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-xs font-medium ml-auto",
+                            req.status === "Pending"
+                              ? "bg-gray-100 text-gray-600"
+                              : req.status === "InProgress"
+                                ? "bg-blue-100 text-blue-700"
+                                : req.status === "Fulfilled"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700",
+                          )}
+                        >
+                          {req.status}
+                        </span>
+                      </div>
+
+                      {/* Course + category */}
+                      <div className="mt-1 flex items-center gap-2">
+                        {req.courseCode && (
+                          <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                            {req.courseCode}
+                          </span>
+                        )}
+                        {req.courseName && (
+                          <span className="text-xs text-gray-500">
+                            {req.courseName}
+                          </span>
+                        )}
+                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          {req.category}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="mt-2 text-sm text-gray-700">
+                        {req.description}
+                      </p>
+
+                      {/* Existing reply */}
+                      {req.reply && (
+                        <div className="mt-2 rounded-lg border-l-4 border-blue-400 bg-blue-50 px-3 py-2">
+                          <p className="text-xs font-medium text-blue-700">
+                            Reply by {req.repliedBy?.name} ·{" "}
+                            {new Date(req.repliedAt).toLocaleDateString(
+                              "en-GB",
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-sm text-blue-800">
+                            {req.reply}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <select
+                          value={req.status}
+                          onChange={(e) =>
+                            handleStatusChange(req._id, e.target.value)
+                          }
+                          className="rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none"
+                        >
+                          {[
+                            "Pending",
+                            "InProgress",
+                            "Fulfilled",
+                            "Declined",
+                          ].map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          onClick={() => {
+                            setReplyModal(req);
+                            setReplyText(req.reply || "");
+                          }}
+                          className="rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                        >
+                          {req.reply ? "✏️ Edit Reply" : "💬 Reply"}
+                        </button>
+
+                        {["Admin", "SuperAdmin"].includes(userRole) && (
+                          <button
+                            onClick={() => handleDeleteRequest(req._id)}
+                            className="rounded-lg px-3 py-1 text-xs text-red-500 hover:bg-red-50"
+                          >
+                            🗑 Delete
+                          </button>
+                        )}
+
+                        <span className="ml-auto text-xs text-gray-400">
+                          {new Date(req.createdAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        >
-          {s || "All"}
-        </button>
+
+          {/* Reply modal */}
+          {replyModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+              onClick={() => setReplyModal(null)}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">
+                      Reply to Request
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {replyModal.requestedBy?.name} ·{" "}
+                      {replyModal.courseCode || "General"} ·{" "}
+                      {replyModal.category}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReplyModal(null)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mb-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  <p className="text-xs font-medium text-gray-400 mb-1">
+                    Original request:
+                  </p>
+                  {replyModal.description}
+                </div>
+
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write your reply... (this will be emailed to the student)"
+                  rows={4}
+                  maxLength={1000}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none"
+                  autoFocus
+                />
+                <p className="mt-1 text-right text-xs text-gray-400">
+                  {replyText.length}/1000
+                </p>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={handleReply}
+                    disabled={!replyText.trim() || replyLoading}
+                    className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {replyLoading ? "Sending…" : "Send Reply"}
+                  </button>
+                  <button
+                    onClick={() => setReplyModal(null)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Routine Tab */}
+{tab === "routine" && (
+  <div className="mt-6 space-y-5">
+    <h2 className="font-semibold text-gray-900">Routine Management</h2>
+    <p className="text-sm text-gray-500">
+      View and manage class routines for any section. Use the
+      <a href="/routine" className="mx-1 text-blue-600 underline">Routine page</a>
+      to create and edit entries.
+    </p>
+
+    {/* Filter */}
+    <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      {[
+        { label: "Dept",  name: "dept",  options: ["CSE","EEE","ME","CE","TE","BBA","ENG"] },
+        { label: "Level", name: "level", options: [1,2,3,4] },
+        { label: "Term",  name: "term",  options: [1,2] },
+      ].map(({ label, name, options }) => (
+        <div key={name}>
+          <label className="mb-1 block text-xs font-medium text-gray-500">{label}</label>
+          <select
+            value={routineFilter[name]}
+            onChange={(e) => setRoutineFilter((f) => ({ ...f, [name]: e.target.value }))}
+            className="rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none"
+          >
+            <option value="">—</option>
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {name === "level" ? `L${o}` : name === "term" ? `T${o}` : o}
+              </option>
+            ))}
+          </select>
+        </div>
       ))}
-      <span className="ml-auto text-sm text-gray-500">{requestsTotal} requests</span>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-500">Session</label>
+        <input
+          value={routineFilter.session}
+          onChange={(e) => setRoutineFilter((f) => ({ ...f, session: e.target.value }))}
+          placeholder="e.g. Winter 2026"
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none w-36"
+        />
+      </div>
+      <button
+        onClick={fetchRoutineAdmin}
+        disabled={!routineFilter.dept || !routineFilter.level || !routineFilter.term}
+        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        Load Routine
+      </button>
     </div>
 
-    {requestsLoading ? (
-      <div className="flex justify-center py-10">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+    {/* Result */}
+    {routineLoading ? (
+      <div className="h-32 animate-pulse rounded-xl bg-gray-100" />
+    ) : !routineData ? (
+      <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+        Select dept, level, term and click Load Routine.
       </div>
     ) : (
-      <div className="space-y-3">
-        {requests.length === 0 && (
-          <div className="py-10 text-center text-sm text-gray-400">No requests found.</div>
-        )}
-        {requests.map((req) => (
-          <div key={req._id} className="card p-4">
-            <div className="flex items-start gap-3">
-              {/* Avatar */}
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                {req.requestedBy?.name?.[0]?.toUpperCase()}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                {/* Header */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-gray-900">{req.requestedBy?.name}</span>
-                  <span className="text-xs text-gray-400">{req.requestedBy?.studentId}</span>
-                  <span className="text-xs text-gray-400">
-                    {req.dept} L{req.level}T{req.term}
-                  </span>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-xs font-medium ml-auto",
-                    req.status === "Pending"    ? "bg-gray-100 text-gray-600"  :
-                    req.status === "InProgress" ? "bg-blue-100 text-blue-700"  :
-                    req.status === "Fulfilled"  ? "bg-green-100 text-green-700":
-                    "bg-red-100 text-red-700"
-                  )}>
-                    {req.status}
-                  </span>
-                </div>
-
-                {/* Course + category */}
-                <div className="mt-1 flex items-center gap-2">
-                  {req.courseCode && (
-                    <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
-                      {req.courseCode}
-                    </span>
-                  )}
-                  {req.courseName && (
-                    <span className="text-xs text-gray-500">{req.courseName}</span>
-                  )}
-                  <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                    {req.category}
-                  </span>
-                </div>
-
-                {/* Description */}
-                <p className="mt-2 text-sm text-gray-700">{req.description}</p>
-
-                {/* Existing reply */}
-                {req.reply && (
-                  <div className="mt-2 rounded-lg border-l-4 border-blue-400 bg-blue-50 px-3 py-2">
-                    <p className="text-xs font-medium text-blue-700">
-                      Reply by {req.repliedBy?.name} · {new Date(req.repliedAt).toLocaleDateString("en-GB")}
-                    </p>
-                    <p className="mt-0.5 text-sm text-blue-800">{req.reply}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <select
-                    value={req.status}
-                    onChange={(e) => handleStatusChange(req._id, e.target.value)}
-                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none"
-                  >
-                    {["Pending", "InProgress", "Fulfilled", "Declined"].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-
-                  <button
-                    onClick={() => { setReplyModal(req); setReplyText(req.reply || ""); }}
-                    className="rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                  >
-                    {req.reply ? "✏️ Edit Reply" : "💬 Reply"}
-                  </button>
-
-                  {["Admin", "SuperAdmin"].includes(userRole) && (
-                    <button
-                      onClick={() => handleDeleteRequest(req._id)}
-                      className="rounded-lg px-3 py-1 text-xs text-red-500 hover:bg-red-50"
-                    >
-                      🗑 Delete
-                    </button>
-                  )}
-
-                  <span className="ml-auto text-xs text-gray-400">
-                    {new Date(req.createdAt).toLocaleDateString("en-GB", {
-                      day: "numeric", month: "short", year: "numeric"
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-
-    {/* Reply modal */}
-    {replyModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        onClick={() => setReplyModal(null)}>
-        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-          onClick={(e) => e.stopPropagation()}>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-gray-900">Reply to Request</h2>
-              <p className="text-xs text-gray-500">
-                {replyModal.requestedBy?.name} · {replyModal.courseCode || "General"} · {replyModal.category}
-              </p>
-            </div>
-            <button onClick={() => setReplyModal(null)}
-              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">✕</button>
-          </div>
-
-          <div className="mb-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <p className="text-xs font-medium text-gray-400 mb-1">Original request:</p>
-            {replyModal.description}
-          </div>
-
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Write your reply... (this will be emailed to the student)"
-            rows={4}
-            maxLength={1000}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none"
-            autoFocus
-          />
-          <p className="mt-1 text-right text-xs text-gray-400">{replyText.length}/1000</p>
-
-          <div className="mt-3 flex gap-2">
+      <div className="space-y-4">
+        {/* Status strip */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={cn(
+            "rounded-full px-3 py-1 text-xs font-medium",
+            routineData.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+          )}>
+            {routineData.isActive ? "Active" : "Inactive"}
+          </span>
+          <span className="text-xs text-gray-500">
+            Session: {routineData.session}
+          </span>
+          {routineData.batch && (
+            <span className="text-xs text-gray-500">Batch: {routineData.batch}</span>
+          )}
+          <span className="text-xs text-gray-500">
+            {routineData.schedule?.length || 0} classes/week
+          </span>
+          {routineData.isActive && (
             <button
-              onClick={handleReply}
-              disabled={!replyText.trim() || replyLoading}
-              className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              onClick={async () => {
+                const res = await fetch(
+                  `${import.meta.env.VITE_API_URL}/routine/${routineData._id}/deactivate`,
+                  { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+                );
+                if (res.ok) {
+                  setRoutineData((r) => ({ ...r, isActive: false }));
+                  toast.success("Routine deactivated.");
+                }
+              }}
+              className="rounded-lg border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
             >
-              {replyLoading ? "Sending…" : "Send Reply"}
+              Deactivate
             </button>
-            <button onClick={() => setReplyModal(null)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
-              Cancel
-            </button>
-          </div>
+          )}
+        </div>
+
+        {/* Schedule table */}
+        <div className="card overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-gray-100 bg-gray-50">
+              <tr>
+                {["Day", "Time", "Course", "Teacher", "Room", "Type"].map((h) => (
+                  <th key={h} className="px-3 py-3 text-xs font-semibold text-gray-500 first:pl-4 last:pr-4">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {routineData.schedule?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-sm text-gray-400">
+                    No classes in this routine yet.
+                  </td>
+                </tr>
+              )}
+              {[...( routineData.schedule || [])].sort((a,b) => {
+                const dayOrder = ["Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday"];
+                return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day) || a.startTime.localeCompare(b.startTime);
+              }).map((entry) => (
+                <tr key={entry._id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="py-3 pl-4 pr-3">
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      {entry.day}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-xs text-gray-600">
+                    {entry.startTime} – {entry.endTime}
+                  </td>
+                  <td className="px-3 py-3">
+                    <p className="font-medium text-gray-900">{entry.courseCode}</p>
+                    {entry.courseName && <p className="text-xs text-gray-400">{entry.courseName}</p>}
+                  </td>
+                  <td className="px-3 py-3 text-xs text-gray-500">{entry.teacherName || "—"}</td>
+                  <td className="px-3 py-3 text-xs text-gray-500">{entry.room || "—"}</td>
+                  <td className="px-3 py-3">
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      entry.type === "Lab"      ? "bg-green-100 text-green-700"  :
+                      entry.type === "Tutorial" ? "bg-purple-100 text-purple-700":
+                      "bg-blue-100 text-blue-700"
+                    )}>
+                      {entry.type}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     )}

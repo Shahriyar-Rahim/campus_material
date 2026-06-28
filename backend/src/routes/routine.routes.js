@@ -6,7 +6,8 @@ import {
   upsertScheduleEntry,
   deleteScheduleEntry,
   deactivateRoutine,
-  getMyCourses, // Ensure this is imported
+  getMyCourses,
+  getFormattedRoutine
 } from "../controllers/routine.controller.js";
 import {
   getDashboardStats,
@@ -29,12 +30,29 @@ router.use(protect);
 // Accessible by all authenticated users
 router.get("/my", getMyRoutine);
 router.get("/", getRoutine);
+router.get("/formatted", protect, getFormattedRoutine);
 
 // Administrative Routine Management
-router.post("/", restrictTo("Admin", "SuperAdmin"), createOrUpdateRoutine);
-router.patch("/:id/entry", restrictTo("Admin", "SuperAdmin"), upsertScheduleEntry);
-router.delete("/:id/entry/:entryId", restrictTo("Admin", "SuperAdmin"), deleteScheduleEntry);
-router.patch("/:id/deactivate", restrictTo("Admin", "SuperAdmin"), deactivateRoutine);
+router.post(
+  "/",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  createOrUpdateRoutine,
+);
+router.patch(
+  "/:id/entry",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  upsertScheduleEntry,
+);
+router.delete(
+  "/:id/entry/:entryId",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  deleteScheduleEntry,
+);
+router.patch(
+  "/:id/deactivate",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  deactivateRoutine,
+);
 
 // --- ADMIN ROUTER (System & User Management) ---
 const adminRouter = Router();

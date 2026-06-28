@@ -34,6 +34,10 @@ export default function NavBar() {
     { to: "/dashboard", label: "Dashboard" },
     { to: "/materials", label: "Materials" },
     { to: "/planner",   label: "Planner" },
+     ...( ["CR","Teacher","Admin","SuperAdmin"].includes(role)
+    ? [{ to: "/routine", label: "Routine" }]
+    : []
+  ),
   ];
 
   const showAdminLink = ["Admin", "SuperAdmin"].includes(role);

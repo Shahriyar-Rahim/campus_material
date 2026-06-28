@@ -1,7 +1,10 @@
 import { useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectCurrentUser, updateUser } from "../../redux/features/authSlice";
-import { useUpdateProfileMutation, useChangePasswordMutation } from "../../redux/api/authApi";
+import {
+  useUpdateProfileMutation,
+  useChangePasswordMutation,
+} from "../../redux/api/authApi";
 import toast from "react-hot-toast";
 
 export default function ProfilePage() {
@@ -9,20 +12,33 @@ export default function ProfilePage() {
   const dispatch = useDispatch();
   const fileRef = useRef(null);
 
-  const [updateProfile, { isLoading: updatingProfile }] = useUpdateProfileMutation();
-  const [changePassword, { isLoading: changingPw }] = useChangePasswordMutation();
+  const [updateProfile, { isLoading: updatingProfile }] =
+    useUpdateProfileMutation();
+  const [changePassword, { isLoading: changingPw }] =
+    useChangePasswordMutation();
 
   const [preview, setPreview] = useState(null);
-  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
+  const [pwForm, setPwForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirm: "",
+  });
   const [pwError, setPwError] = useState("");
-  
+
   // Section edit layout parameters
   const [sectionEdit, setSectionEdit] = useState(false);
   const [sectionForm, setSectionForm] = useState({
     level: user?.level || 1,
     term: user?.term || 1,
-    session: user?.session || "", // Added session parsing tracking hook properties
+    session: user?.session || "",
+    sessionStartDate: user?.sessionDuration?.startDate
+      ? new Date(user.sessionDuration.startDate).toISOString().split("T")[0]
+      : "",
+    sessionEndDate: user?.sessionDuration?.endDate
+      ? new Date(user.sessionDuration.endDate).toISOString().split("T")[0]
+      : "",
   });
+
   const [sectionError, setSectionError] = useState("");
   const [sectionLoading, setSectionLoading] = useState(false);
 
@@ -47,18 +63,48 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSectionSubmit = async (e) => {
+  const handleSectionUpdate = async (e) => {
     e.preventDefault();
     setSectionError("");
     setSectionLoading(true);
     try {
-      // Passes level, term, and academic session attributes parameters
-      const res = await updateProfile(sectionForm).unwrap();
-      dispatch(updateUser(res.data.user));
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/update-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            level: Number(sectionForm.level),
+            term: Number(sectionForm.term),
+            session: sectionForm.session,
+            sessionDuration: {
+              startDate: sectionForm.sessionStartDate || null,
+              endDate: sectionForm.sessionEndDate || null,
+            },
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      dispatch(
+        updateUser({
+          level: Number(sectionForm.level),
+          term: Number(sectionForm.term),
+          session: sectionForm.session,
+          sessionDuration: {
+            startDate: sectionForm.sessionStartDate || null,
+            endDate: sectionForm.sessionEndDate || null,
+          },
+        }),
+      );
+      toast.success("Academic info updated.");
       setSectionEdit(false);
-      toast.success("Academic information updated successfully!");
     } catch (err) {
-      setSectionError(err.data?.message || "Failed to update details.");
+      setSectionError(err.message);
     } finally {
       setSectionLoading(false);
     }
@@ -82,10 +128,12 @@ export default function ProfilePage() {
         currentPassword: pwForm.currentPassword,
         newPassword: pwForm.newPassword,
       }).unwrap();
-      
+
       dispatch(updateUser(res.data.user));
       setPwForm({ currentPassword: "", newPassword: "", confirm: "" });
-      toast.success("Password changed! Cryptographic lineage tracking log generated.");
+      toast.success(
+        "Password changed! Cryptographic lineage tracking log generated.",
+      );
     } catch (err) {
       setPwError(err.data?.message || "Failed to modify password.");
     }
@@ -97,7 +145,11 @@ export default function ProfilePage() {
       <div className="card flex flex-col items-center gap-6 p-6 sm:flex-row sm:items-start">
         <div className="group relative h-24 w-24 shrink-0 rounded-full bg-gray-100">
           <img
-            src={preview || user?.profilePicture?.url || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`}
+            src={
+              preview ||
+              user?.profilePicture?.url ||
+              `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`
+            }
             alt="Profile Avatar"
             className="h-24 w-24 rounded-full object-cover border border-gray-200"
           />
@@ -107,15 +159,23 @@ export default function ProfilePage() {
           >
             Change
           </button>
-          <input type="file" ref={fileRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+          <input
+            type="file"
+            ref={fileRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
         </div>
 
         <div className="flex-1 text-center sm:text-left space-y-2">
           <div>
             <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
-            <p className="text-sm text-gray-500">{user?.studentId} • {user?.email}</p>
+            <p className="text-sm text-gray-500">
+              {user?.studentId} • {user?.email}
+            </p>
           </div>
-          
+
           {preview && (
             <button
               onClick={handlePictureUpload}
@@ -129,105 +189,182 @@ export default function ProfilePage() {
       </div>
 
       {/* Academic Profile Details Information Form Component Section */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-          <h3 className="font-semibold text-gray-900">Academic Information</h3>
-          {!sectionEdit && (
-            <button onClick={() => setSectionEdit(true)} className="text-sm font-medium text-blue-600 hover:underline">
-              Edit Layout
-            </button>
-          )}
+      {/* Session edit */}
+      <div className="card mb-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Academic Info</h3>
+          <button
+            onClick={() => setSectionEdit((v) => !v)}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            {sectionEdit ? "Cancel" : "Edit"}
+          </button>
         </div>
 
+        {sectionError && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {sectionError}
+          </div>
+        )}
+
         {sectionEdit ? (
-          <form onSubmit={handleSectionSubmit} className="space-y-4">
-            {sectionError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{sectionError}</div>
-            )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <form onSubmit={handleSectionUpdate} className="space-y-3">
+            {/* Level / Term */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase">Level</label>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Level
+                </label>
                 <select
-                  className="input text-sm bg-white"
                   value={sectionForm.level}
-                  onChange={(e) => setSectionForm((f) => ({ ...f, level: Number(e.target.value) }))}
+                  onChange={(e) =>
+                    setSectionForm((f) => ({ ...f, level: e.target.value }))
+                  }
+                  className="input text-sm"
                 >
                   {[1, 2, 3, 4].map((l) => (
-                    <option key={l} value={l}>Level {l}</option>
+                    <option key={l} value={l}>
+                      L{l}
+                    </option>
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase">Term</label>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Term
+                </label>
                 <select
-                  className="input text-sm bg-white"
                   value={sectionForm.term}
-                  onChange={(e) => setSectionForm((f) => ({ ...f, term: Number(e.target.value) }))}
+                  onChange={(e) =>
+                    setSectionForm((f) => ({ ...f, term: e.target.value }))
+                  }
+                  className="input text-sm"
                 >
                   {[1, 2].map((t) => (
-                    <option key={t} value={t}>Term {t}</option>
+                    <option key={t} value={t}>
+                      T{t}
+                    </option>
                   ))}
                 </select>
               </div>
+            </div>
 
-              {/* Academic Session Input Selection Parameter Segment Block */}
+            {/* Session */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Session
+              </label>
+              <input
+                value={sectionForm.session}
+                onChange={(e) =>
+                  setSectionForm((f) => ({ ...f, session: e.target.value }))
+                }
+                placeholder="e.g. Winter 2026"
+                className="input text-sm"
+              />
+            </div>
+
+            {/* Session duration */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase">Academic Session</label>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Session Start
+                </label>
                 <input
-                  type="text"
-                  placeholder="e.g. Spring 2026"
+                  type="date"
+                  value={sectionForm.sessionStartDate}
+                  onChange={(e) =>
+                    setSectionForm((f) => ({
+                      ...f,
+                      sessionStartDate: e.target.value,
+                    }))
+                  }
                   className="input text-sm"
-                  value={sectionForm.session}
-                  onChange={(e) => setSectionForm((f) => ({ ...f, session: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Session End
+                </label>
+                <input
+                  type="date"
+                  value={sectionForm.sessionEndDate}
+                  onChange={(e) =>
+                    setSectionForm((f) => ({
+                      ...f,
+                      sessionEndDate: e.target.value,
+                    }))
+                  }
+                  className="input text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSectionEdit(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button type="submit" disabled={sectionLoading} className="btn-primary py-2 px-4 text-sm">
-                {sectionLoading ? "Saving..." : "Save Structural Updates"}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={sectionLoading}
+              className="btn-primary w-full justify-center py-2 text-sm"
+            >
+              {sectionLoading ? "Saving…" : "Save Changes"}
+            </button>
           </form>
         ) : (
-          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase">Department</p>
-              <p className="mt-0.5 font-semibold text-gray-800">{user?.dept || "Not Allocated"}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase">Academic Semester</p>
-              <p className="mt-0.5 font-semibold text-gray-800">Level {user?.level || 1} — Term {user?.term || 1}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase">Session Group</p>
-              <p className="mt-0.5 font-semibold text-gray-800">{user?.session || "None Configured"}</p>
-            </div>
+          <div className="space-y-2">
+            {[
+              ["Department", user?.dept],
+              ["Batch", user?.batch],
+              ["Level / Term", `L${user?.level} T${user?.term}`],
+              ["Session", user?.session || "Not set"],
+              [
+                "Session Start",
+                user?.sessionDuration?.startDate
+                  ? new Date(user.sessionDuration.startDate).toLocaleDateString(
+                      "en-GB",
+                    )
+                  : "—",
+              ],
+              [
+                "Session End",
+                user?.sessionDuration?.endDate
+                  ? new Date(user.sessionDuration.endDate).toLocaleDateString(
+                      "en-GB",
+                    )
+                  : "—",
+              ],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="flex items-center justify-between border-b border-gray-50 py-1.5 last:border-0"
+              >
+                <span className="text-sm text-gray-500">{label}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {value}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       {/* Change Password Panel Form Interface Block */}
       <div className="card p-6">
-        <h3 className="mb-4 font-semibold text-gray-900 border-b border-gray-100 pb-3">Security & Recovery Chain</h3>
+        <h3 className="mb-4 font-semibold text-gray-900 border-b border-gray-100 pb-3">
+          Security & Recovery Chain
+        </h3>
         <form onSubmit={handlePasswordChange} className="space-y-3">
           {pwError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{pwError}</div>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {pwError}
+            </div>
           )}
           <input
             type="password"
             placeholder="Current password"
             className="input text-sm"
             value={pwForm.currentPassword}
-            onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+            onChange={(e) =>
+              setPwForm((f) => ({ ...f, currentPassword: e.target.value }))
+            }
             required
           />
           <input
@@ -235,7 +372,9 @@ export default function ProfilePage() {
             placeholder="New password (min 8 chars)"
             className="input text-sm"
             value={pwForm.newPassword}
-            onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+            onChange={(e) =>
+              setPwForm((f) => ({ ...f, newPassword: e.target.value }))
+            }
             required
           />
           <input
@@ -243,11 +382,19 @@ export default function ProfilePage() {
             placeholder="Confirm new password"
             className="input text-sm"
             value={pwForm.confirm}
-            onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+            onChange={(e) =>
+              setPwForm((f) => ({ ...f, confirm: e.target.value }))
+            }
             required
           />
-          <button type="submit" disabled={changingPw} className="btn-primary w-full justify-center py-2.5 text-sm">
-            {changingPw ? "Processing Ledger Modifications..." : "Update Password & Notify"}
+          <button
+            type="submit"
+            disabled={changingPw}
+            className="btn-primary w-full justify-center py-2.5 text-sm"
+          >
+            {changingPw
+              ? "Processing Ledger Modifications..."
+              : "Update Password & Notify"}
           </button>
         </form>
       </div>
