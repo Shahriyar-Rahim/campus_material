@@ -64,52 +64,80 @@ export default function ProfilePage() {
     }
   };
 
+  // const handleSectionUpdate = async (e) => {
+  //   e.preventDefault();
+  //   setSectionError("");
+  //   setSectionLoading(true);
+  //   try {
+  //     const res = await fetch(
+  //       `${import.meta.env.VITE_API_URL}/auth/update-profile`,
+  //       {
+  //         method: "PATCH",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //         credentials: "include",
+  //         body: JSON.stringify({
+  //           level: Number(sectionForm.level),
+  //           term: Number(sectionForm.term),
+  //           session: sectionForm.session,
+  //           sessionDuration: {
+  //             startDate: sectionForm.sessionStartDate || null,
+  //             endDate: sectionForm.sessionEndDate || null,
+  //           },
+  //         }),
+  //       },
+  //     );
+  //     const data = await res.json();
+  //     if (!res.ok) throw new Error(data.message);
+  //     dispatch(
+  //       updateUser({
+  //         level: Number(sectionForm.level),
+  //         term: Number(sectionForm.term),
+  //         session: sectionForm.session,
+  //         sessionDuration: {
+  //           startDate: sectionForm.sessionStartDate || null,
+  //           endDate: sectionForm.sessionEndDate || null,
+  //         },
+  //       }),
+  //     );
+  //     toast.success("Academic info updated.");
+  //     setSectionEdit(false);
+  //   } catch (err) {
+  //     setSectionError(err.message);
+  //   } finally {
+  //     setSectionLoading(false);
+  //   }
+  // };
+
   const handleSectionUpdate = async (e) => {
-    e.preventDefault();
-    setSectionError("");
-    setSectionLoading(true);
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/update-profile`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            level: Number(sectionForm.level),
-            term: Number(sectionForm.term),
-            session: sectionForm.session,
-            sessionDuration: {
-              startDate: sectionForm.sessionStartDate || null,
-              endDate: sectionForm.sessionEndDate || null,
-            },
-          }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      dispatch(
-        updateUser({
-          level: Number(sectionForm.level),
-          term: Number(sectionForm.term),
-          session: sectionForm.session,
-          sessionDuration: {
-            startDate: sectionForm.sessionStartDate || null,
-            endDate: sectionForm.sessionEndDate || null,
-          },
-        }),
-      );
-      toast.success("Academic info updated.");
-      setSectionEdit(false);
-    } catch (err) {
-      setSectionError(err.message);
-    } finally {
-      setSectionLoading(false);
-    }
-  };
+  e.preventDefault();
+  setSectionError("");
+  setSectionLoading(true);
+  try {
+    // 1. Use your existing RTK Query mutation hooks instead of native fetch
+    const res = await updateProfile({
+      level: Number(sectionForm.level),
+      term: Number(sectionForm.term),
+      session: sectionForm.session,
+      sessionDuration: {
+        startDate: sectionForm.sessionStartDate || null,
+        endDate: sectionForm.sessionEndDate || null,
+      },
+    }).unwrap();
+
+    // 2. Dispatch the updated user structure to your global Redux auth slice
+    dispatch(updateUser(res.data.user));
+    
+    toast.success("Academic info updated.");
+    setSectionEdit(false);
+  } catch (err) {
+    setSectionError(err.data?.message || err.message || "Failed to update info.");
+  } finally {
+    setSectionLoading(false);
+  }
+};
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();

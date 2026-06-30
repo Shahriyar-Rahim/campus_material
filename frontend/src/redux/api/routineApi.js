@@ -31,7 +31,64 @@ export const routineApi = createApi({
     getMyRoutine: builder.query({
       query: () => "/routine/my",
     }),
+    getFormattedRoutine: builder.query({
+      query: ({ dept, level, term, session } = {}) => ({
+        url: "/routine/formatted",
+        params: { dept, level, term, session },
+      }),
+    }),
+    getRoutineTimeline: builder.query({
+      query: ({ dept, level, term, session, from, to }) => ({
+        url: "/routine/timeline",
+        params: { dept, level, term, session, from, to },
+      }),
+      providesTags: ["Routine"],
+    }),
+
+    suspendDates: builder.mutation({
+      query: ({ id, dates, reason }) => ({
+        url: `/routine/${id}/suspend`,
+        method: "PATCH",
+        body: { dates, reason },
+      }),
+      invalidatesTags: ["Routine"],
+    }),
+
+    unsuspendDate: builder.mutation({
+      query: ({ id, date }) => ({
+        url: `/routine/${id}/unsuspend`,
+        method: "PATCH",
+        body: { date },
+      }),
+      invalidatesTags: ["Routine"],
+    }),
+
+    addExtraClass: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/routine/${id}/extra`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Routine"],
+    }),
+
+    removeExtraClass: builder.mutation({
+      query: ({ id, extraId }) => ({
+        url: `/routine/${id}/extra/${extraId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Routine"],
+    }),
   }),
 });
 
-export const { useGetMyCoursesQuery, useGetMyRoutineQuery } = routineApi;
+export const {
+  useGetMyCoursesQuery,
+  useGetMyRoutineQuery,
+  useGetFormattedRoutineQuery,
+  useGetRoutineTimelineQuery, // new
+  useSuspendDatesMutation,
+  useUnsuspendDateMutation,
+  useAddExtraClassMutation,
+  useRemoveExtraClassMutation,
+} = routineApi;

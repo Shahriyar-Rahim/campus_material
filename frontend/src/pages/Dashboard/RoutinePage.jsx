@@ -55,11 +55,13 @@ const EMPTY_ENTRY = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const timeToMins = (t) => {
+  if (!t) return 0;
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 };
 
 const fmtTime = (t) => {
+  if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
   const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
@@ -164,7 +166,17 @@ function NextClassBanner({ schedule }) {
 
 // ── Entry Form Modal ──────────────────────────────────────────────────────────
 function EntryModal({ entry, courses, onSave, onClose, isSaving }) {
-  const [form, setForm] = useState(entry || { ...EMPTY_ENTRY });
+  const [form, setForm] = useState(() => ({
+    day: entry?.day || "Saturday",
+  startTime: entry?.startTime || "08:00",
+  endTime: entry?.endTime || "09:30",
+  courseCode: entry?.courseCode || "",
+  courseName: entry?.courseName || "",
+  teacherName: entry?.teacherName || "",
+  teacherShortForm: entry?.teacherShortForm || "",
+  room: entry?.room || "",
+  type: entry?.type || "Theory",
+  }));
   const handle = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   // When course code changes, auto-fill course name
@@ -262,7 +274,7 @@ function EntryModal({ entry, courses, onSave, onClose, isSaving }) {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Room / Lab</label>
-              <input name="room" value={form.room} onChange={handle}
+              <input name="room" value={form.room || ""} onChange={handle}
                 placeholder="e.g. 301, Lab-A"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
             </div>
@@ -610,6 +622,186 @@ function AddToPlannerModal({ classEntry, onClose }) {
   );
 }
 
+function SuspendDatesForm({ routineId, token, onDone, onClose }) {
+  const [dates, setDates]   = useState([""]);
+  const [reason, setReason] = useState("Holiday");
+  const [saving, setSaving] = useState(false);
+
+  const addDate = () => setDates((d) => [...d, ""]);
+  const updateDate = (i, v) => setDates((d) => d.map((x, idx) => idx === i ? v : x));
+  const removeDate = (i) => setDates((d) => d.filter((_, idx) => idx !== i));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const valid = dates.filter(Boolean);
+    if (!valid.length) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/routine/${routineId}/suspend`,
+        { method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          credentials: "include",
+          body: JSON.stringify({ dates: valid, reason }) }
+      );
+      if (res.ok) { toast.success(`${valid.length} date(s) suspended.`); onDone(); }
+      else { const j = await res.json(); toast.error(j.message || "Failed."); }
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">Reason</label>
+        <input value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Midterm Exam, Eid Holiday"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+      </div>
+      <div className="space-y-2">
+        <label className="mb-1 block text-xs font-medium text-gray-600">Dates to suspend</label>
+        {dates.map((d, i) => (
+          <div key={i} className="flex gap-2">
+            <input type="date" value={d} onChange={(e) => updateDate(i, e.target.value)}
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+            {dates.length > 1 && (
+              <button type="button" onClick={() => removeDate(i)}
+                className="rounded-lg border border-red-200 px-2 text-red-500 hover:bg-red-50">✕</button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={addDate}
+          className="text-xs text-blue-600 hover:underline">+ Add another date</button>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving}
+          className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+          {saving ? "Suspending…" : "Suspend Dates"}
+        </button>
+        <button type="button" onClick={onClose}
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ExtraClassForm({ routineId, courses, token, onDone, onClose }) {
+  const [form, setForm] = useState({
+    date: "", courseCode: "", courseName: "", teacherName: "",
+    teacherShortForm: "", room: "", startTime: "08:00", endTime: "09:30",
+    type: "Theory", note: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handle = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  const handleCourseSelect = (e) => {
+    const code  = e.target.value;
+    const found = courses.find((c) => c.courseCode === code);
+    setForm((f) => ({ ...f, courseCode: code, courseName: found?.courseName || f.courseName }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/routine/${routineId}/extra`,
+        { method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          credentials: "include",
+          body: JSON.stringify(form) }
+      );
+      if (res.ok) { toast.success("Extra class added."); onDone(); }
+      else { const j = await res.json(); toast.error(j.message || "Failed."); }
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Date *</label>
+          <input type="date" name="date" value={form.date} onChange={handle}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" required />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+          <select name="type" value={form.type} onChange={handle}
+            className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none">
+            {["Theory","Lab","Tutorial"].map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Start Time</label>
+          <select name="startTime" value={form.startTime} onChange={handle}
+            className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none">
+            {TIME_SLOTS.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">End Time</label>
+          <select name="endTime" value={form.endTime} onChange={handle}
+            className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm focus:outline-none">
+            {TIME_SLOTS.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">Course *</label>
+        {courses.length > 0 ? (
+          <select value={form.courseCode} onChange={handleCourseSelect}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+            <option value="">Select course…</option>
+            {courses.map((c) => (
+              <option key={c.courseCode} value={c.courseCode}>
+                {c.courseCode} — {c.courseName}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input name="courseCode" value={form.courseCode} onChange={handle}
+            placeholder="e.g. CSE-1101"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase focus:border-blue-400 focus:outline-none" required />
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Teacher</label>
+          <input name="teacherName" value={form.teacherName} onChange={handle}
+            placeholder="e.g. Dr. Rahman"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Room</label>
+          <input name="room" value={form.room || ""} onChange={handle}
+            placeholder="e.g. 301"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+        </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">Note (optional)</label>
+        <input name="note" value={form.note} onChange={handle}
+          placeholder="e.g. Make-up class for 15 Mar"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving}
+          className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+          {saving ? "Adding…" : "Add Extra Class"}
+        </button>
+        <button type="button" onClick={onClose}
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function RoutinePage() {
   const user  = useSelector(selectCurrentUser);
@@ -622,6 +814,34 @@ export default function RoutinePage() {
   const { data: sessionsData } = useGetSessionsQuery();
   const activeSessions = (sessionsData?.data || []).filter((s) => s.isActive);
 
+  // timeline state
+  const [timelineData, setTimelineData] = useState(null);
+const [timelineLoading, setTimelineLoading] = useState(false);
+const [timelineRange, setTimelineRange] = useState({ from: "", to: "" });
+const [suspendModal, setSuspendModal]   = useState(false);
+const [extraModal, setExtraModal]       = useState(false);
+
+const fetchTimeline = async (from, to) => {
+  if (!filter.session) return;
+  setTimelineLoading(true);
+  try {
+    const params = new URLSearchParams({
+      dept: filter.dept, level: filter.level, term: filter.term,
+    });
+    if (filter.session) params.set("session", filter.session);
+    if (from) params.set("from", from);
+    if (to)   params.set("to",   to);
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/routine/timeline?${params}`,
+      { headers: { Authorization: `Bearer ${token}` }, credentials: "include" }
+    );
+    const json = await res.json();
+    if (res.ok) setTimelineData(json.data);
+    else toast.error(json.message || "Failed.");
+  } finally { setTimelineLoading(false); }
+};
+
   // Filter
   const [filter, setFilter] = useState({
     dept:    user?.dept    || "CSE",
@@ -629,6 +849,8 @@ export default function RoutinePage() {
     term:    user?.term    || 1,
     session: user?.session || "",
     batch:   "",
+    startDate: "", 
+  endDate:   "", 
   });
 
   // State
@@ -697,28 +919,45 @@ export default function RoutinePage() {
     }
   }, [activeSessions]);
 
+  useEffect(() => {
+  if (activeTab === "timeline" && routine && !timelineData) {
+    fetchTimeline(
+      routine.startDate ? new Date(routine.startDate).toISOString().split("T")[0] : "",
+      routine.endDate   ? new Date(routine.endDate).toISOString().split("T")[0]   : "",
+    );
+  }
+}, [activeTab, routine]);
+
   const schedule = routine?.schedule || [];
 
   // Create routine
   const handleCreateRoutine = async () => {
-    if (!filter.session) { toast.error("Select a session first."); return; }
-    setSaving(true);
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/routine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        credentials: "include",
-        body: JSON.stringify({
-          dept: filter.dept, level: Number(filter.level),
-          term: Number(filter.term), session: filter.session,
-          batch: filter.batch || "", schedule: [],
-        }),
-      });
-      const json = await res.json();
-      if (res.ok) { setRoutine(json.data); toast.success("Routine created. Add class entries."); }
-      else toast.error(json.message || "Failed.");
-    } finally { setSaving(false); }
-  };
+  if (!filter.session)   { toast.error("Select a session."); return; }
+  if (!filter.startDate) { toast.error("Set a start date for the routine."); return; }
+  if (!filter.endDate)   { toast.error("Set an end date for the routine."); return; }
+
+  setSaving(true);
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/routine`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
+      body: JSON.stringify({
+        dept:      filter.dept,
+        level:     Number(filter.level),
+        term:      Number(filter.term),
+        session:   filter.session,
+        batch:     filter.batch || "",
+        startDate: filter.startDate,
+        endDate:   filter.endDate,
+        schedule:  [],
+      }),
+    });
+    const json = await res.json();
+    if (res.ok) { setRoutine(json.data); toast.success("Routine created."); }
+    else toast.error(json.message || "Failed.");
+  } finally { setSaving(false); }
+};
 
   // Save entry
   const handleSaveEntry = async (formData) => {
@@ -882,6 +1121,23 @@ export default function RoutinePage() {
           </div>
         )}
 
+        {canManage && (
+  <>
+    <div>
+      <label className="mb-1 block text-xs font-medium text-gray-500">Start Date</label>
+      <input type="date" value={filter.startDate}
+        onChange={(e) => setFilter((f) => ({ ...f, startDate: e.target.value }))}
+        className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none" />
+    </div>
+    <div>
+      <label className="mb-1 block text-xs font-medium text-gray-500">End Date</label>
+      <input type="date" value={filter.endDate}
+        onChange={(e) => setFilter((f) => ({ ...f, endDate: e.target.value }))}
+        className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none" />
+    </div>
+  </>
+)}
+
         <div className="flex gap-2">
           <button onClick={() => { fetchRoutine(); fetchCourses(); }}
             className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900">
@@ -982,6 +1238,7 @@ export default function RoutinePage() {
               {[
                 { id: "timetable", label: "🗓 Timetable" },
                 { id: "courses",   label: "📚 Courses" },
+                { id: "timeline",  label: "📅 Timeline" },
               ].map((tab) => (
                 <button key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -1010,6 +1267,312 @@ export default function RoutinePage() {
           {activeTab === "courses" && (
             <CourseList schedule={schedule} courses={courses} />
           )}
+
+          {/* timeline */}
+          {activeTab === "timeline" && (
+  <div className="space-y-4">
+    {/* Routine date range info */}
+    {routine && (
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-blue-500">📅</span>
+          <span className="text-gray-600">Routine period:</span>
+          <span className="font-semibold text-gray-900">
+            {routine.startDate
+              ? new Date(routine.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "—"}
+            {" → "}
+            {routine.endDate
+              ? new Date(routine.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "—"}
+          </span>
+        </div>
+        {timelineData?.summary && (
+          <>
+            <span className="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-medium text-blue-700">
+              {timelineData.summary.totalDays} class days
+            </span>
+            <span className="rounded-full bg-purple-100 px-3 py-0.5 text-xs font-medium text-purple-700">
+              {timelineData.summary.totalClasses} total classes
+            </span>
+            <span className="rounded-full bg-green-100 px-3 py-0.5 text-xs font-medium text-green-700">
+              {timelineData.summary.uniqueCourses.length} courses
+            </span>
+            {timelineData.summary.suspendedDates.length > 0 && (
+              <span className="rounded-full bg-red-100 px-3 py-0.5 text-xs font-medium text-red-700">
+                {timelineData.summary.suspendedDates.length} suspended days
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    )}
+
+    {/* Timeline range picker + actions */}
+    <div className="flex flex-wrap items-end gap-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-500">From</label>
+        <input type="date" value={timelineRange.from}
+          onChange={(e) => setTimelineRange((r) => ({ ...r, from: e.target.value }))}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none" />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
+        <input type="date" value={timelineRange.to}
+          onChange={(e) => setTimelineRange((r) => ({ ...r, to: e.target.value }))}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none" />
+      </div>
+      <button
+        onClick={() => fetchTimeline(timelineRange.from, timelineRange.to)}
+        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+      >
+        Filter
+      </button>
+      {canManage && routine?.isActive && (
+        <>
+          <button onClick={() => setSuspendModal(true)}
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100">
+            🚫 Suspend Dates
+          </button>
+          <button onClick={() => setExtraModal(true)}
+            className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-100">
+            ➕ Add Extra Class
+          </button>
+        </>
+      )}
+    </div>
+
+    {/* Timeline list */}
+    {timelineLoading ? (
+      <div className="h-40 animate-pulse rounded-xl bg-gray-100" />
+    ) : !timelineData ? (
+      <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+        Load the routine first, then switch to Timeline tab.
+      </div>
+    ) : timelineData.timeline.length === 0 ? (
+      <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+        No classes in the selected date range.
+      </div>
+    ) : (
+      <div className="space-y-2">
+        {timelineData.timeline.map((day) => {
+          const isToday = day.dateStr === new Date().toISOString().split("T")[0];
+          const isPast  = new Date(day.date) < new Date() && !isToday;
+
+          return (
+            <div key={day.dateStr} className={cn(
+              "overflow-hidden rounded-xl border",
+              isToday  ? "border-blue-300 shadow-md" :
+              isPast   ? "border-gray-100 opacity-60" :
+              day.isSuspended ? "border-red-200 bg-red-50/30" :
+              "border-gray-100"
+            )}>
+              {/* Day header */}
+              <div className={cn(
+                "flex items-center gap-3 px-4 py-2.5",
+                isToday  ? "bg-blue-600 text-white" :
+                isPast   ? "bg-gray-50" :
+                day.isSuspended ? "bg-red-50" :
+                "bg-gray-50"
+              )}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-sm font-bold",
+                      isToday ? "text-white" : "text-gray-900"
+                    )}>
+                      {new Date(day.date).toLocaleDateString("en-GB", {
+                        weekday: "short", day: "numeric", month: "short", year: "numeric"
+                      })}
+                    </span>
+                    {isToday && (
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">
+                        TODAY
+                      </span>
+                    )}
+                    {day.isSuspended && !day.hasExtras && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-600">
+                        SUSPENDED
+                      </span>
+                    )}
+                    {day.hasExtras && (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                        +EXTRA
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className={cn(
+                  "text-xs",
+                  isToday ? "text-blue-100" : "text-gray-400"
+                )}>
+                  {day.classes.length} class{day.classes.length !== 1 ? "es" : ""}
+                </span>
+
+                {/* Suspend/unsuspend toggle */}
+                {canManage && routine?.isActive && (
+                  <button
+                    onClick={async () => {
+                      if (day.isSuspended) {
+                        const res = await fetch(
+                          `${import.meta.env.VITE_API_URL}/routine/${routine._id}/unsuspend`,
+                          { method: "PATCH",
+                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                            credentials: "include",
+                            body: JSON.stringify({ date: day.dateStr }) }
+                        );
+                        if (res.ok) { toast.success("Date unsuspended."); fetchTimeline(timelineRange.from, timelineRange.to); }
+                      } else {
+                        const reason = prompt("Reason for suspending (e.g. Exam, Public Holiday):", "Holiday");
+                        if (reason === null) return;
+                        const res = await fetch(
+                          `${import.meta.env.VITE_API_URL}/routine/${routine._id}/suspend`,
+                          { method: "PATCH",
+                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                            credentials: "include",
+                            body: JSON.stringify({ dates: [day.dateStr], reason }) }
+                        );
+                        if (res.ok) { toast.success("Date suspended."); fetchTimeline(timelineRange.from, timelineRange.to); }
+                      }
+                    }}
+                    className={cn(
+                      "rounded-lg px-2 py-1 text-[10px] font-medium transition-colors",
+                      day.isSuspended
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                    )}
+                  >
+                    {day.isSuspended ? "Restore" : "Suspend"}
+                  </button>
+                )}
+              </div>
+
+              {/* Classes */}
+              {day.classes.length > 0 && (
+                <div className="divide-y divide-gray-50 px-4">
+                  {day.classes.map((cls, ci) => {
+                    const now = new Date();
+                    const classDate = new Date(day.date);
+                    classDate.setHours(
+                      parseInt(cls.startTime), parseInt(cls.startTime.split(":")[1])
+                    );
+                    const classEnd = new Date(day.date);
+                    classEnd.setHours(
+                      parseInt(cls.endTime), parseInt(cls.endTime.split(":")[1])
+                    );
+                    const isOngoing = isToday && now >= classDate && now <= classEnd;
+                    const isClassPast = now > classEnd;
+
+                    return (
+                      <div key={ci} className={cn(
+                        "flex items-center gap-3 py-2",
+                        isOngoing && "bg-blue-50/50 -mx-4 px-4",
+                        cls.isExtra && "bg-green-50/50 -mx-4 px-4"
+                      )}>
+                        {/* Time */}
+                        <div className="w-24 shrink-0 text-center">
+                          <p className={cn(
+                            "text-xs font-semibold",
+                            isOngoing ? "text-blue-700" : isClassPast && isToday ? "text-gray-300" : "text-gray-700"
+                          )}>
+                            {fmtTime(cls.startTime)}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            – {fmtTime(cls.endTime)}
+                          </p>
+                        </div>
+
+                        {/* Course info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "rounded-lg px-2 py-0.5 text-xs font-bold",
+                              isOngoing ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
+                            )}>
+                              {cls.courseCode}
+                            </span>
+                            {cls.isExtra && (
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                                Extra
+                              </span>
+                            )}
+                            {isOngoing && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                                ONGOING
+                              </span>
+                            )}
+                          </div>
+                          {cls.courseName && (
+                            <p className="mt-0.5 text-xs text-gray-500">{cls.courseName}</p>
+                          )}
+                        </div>
+
+                        {/* Teacher + room + type */}
+                        <div className="shrink-0 text-right text-xs text-gray-400">
+                          {cls.teacherName && <p>{cls.teacherShortForm || cls.teacherName}</p>}
+                          {cls.room && <p>{cls.room}</p>}
+                          <span className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                            cls.type === "Lab"      ? "bg-green-100 text-green-700" :
+                            cls.type === "Tutorial" ? "bg-purple-100 text-purple-700" :
+                            "bg-blue-100 text-blue-700"
+                          )}>
+                            {cls.type}
+                          </span>
+                        </div>
+
+                        {/* Planner button */}
+                        <button
+                          onClick={() => setPlannerModal({ ...cls, day: day.dayName })}
+                          className="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-[10px] text-gray-500 hover:border-blue-300 hover:text-blue-600"
+                          title="Add to Planner"
+                        >
+                          📅
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* Suspend dates modal — simple inline form */}
+    {suspendModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSuspendModal(false)}>
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <h2 className="mb-4 font-semibold text-gray-900">Suspend Dates</h2>
+          <SuspendDatesForm
+            routineId={routine._id}
+            token={token}
+            onDone={() => { setSuspendModal(false); fetchTimeline(timelineRange.from, timelineRange.to); }}
+            onClose={() => setSuspendModal(false)}
+          />
+        </div>
+      </div>
+    )}
+
+    {/* Extra class modal */}
+    {extraModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setExtraModal(false)}>
+        <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <h2 className="mb-4 font-semibold text-gray-900">Add Extra Class</h2>
+          <ExtraClassForm
+            routineId={routine._id}
+            courses={courses}
+            token={token}
+            onDone={() => { setExtraModal(false); fetchTimeline(timelineRange.from, timelineRange.to); }}
+            onClose={() => setExtraModal(false)}
+          />
+        </div>
+      </div>
+    )}
+  </div>
+)}
         </>
       )}
 

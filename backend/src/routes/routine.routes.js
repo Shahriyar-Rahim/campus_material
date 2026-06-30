@@ -2,12 +2,17 @@ import { Router } from "express";
 import {
   getMyRoutine,
   getRoutine,
+  getRoutineTimeline,
   createOrUpdateRoutine,
   upsertScheduleEntry,
   deleteScheduleEntry,
   deactivateRoutine,
   getMyCourses,
-  getFormattedRoutine
+  getFormattedRoutine,
+  suspendDates,  
+  unsuspendDate,   
+  addExtraClass,    
+  removeExtraClass,
 } from "../controllers/routine.controller.js";
 import {
   getDashboardStats,
@@ -32,6 +37,29 @@ router.get("/my", getMyRoutine);
 router.get("/", getRoutine);
 router.get("/formatted", protect, getFormattedRoutine);
 
+// Add these routes in the router:
+router.get("/timeline",  protect, getRoutineTimeline);
+
+router.patch(
+  "/:id/suspend",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  suspendDates
+);
+router.patch(
+  "/:id/unsuspend",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  unsuspendDate
+);
+router.patch(
+  "/:id/extra",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  addExtraClass
+);
+router.delete(
+  "/:id/extra/:extraId",
+  restrictTo("Admin", "SuperAdmin", "Teacher", "CR"),
+  removeExtraClass
+);
 // Administrative Routine Management
 router.post(
   "/",

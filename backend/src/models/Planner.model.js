@@ -135,7 +135,44 @@ const routineSchema = new mongoose.Schema(
     session: { type: String, required: true },
     batch:   { type: String, uppercase: true, trim: true },
 
+    // ── Timeline ──────────────────────────────────────────────────────────────
+    startDate: {
+      type: Date,
+      required: [true, "Routine start date is required"],
+    },
+    endDate: {
+      type: Date,
+      required: [true, "Routine end date is required"],
+    },
+
+    // ── Weekly pattern (unchanged) ────────────────────────────────────────────
     schedule: [routineEntrySchema],
+
+    // ── Exam / Holiday overrides ───────────────────────────────────────────────
+    // Dates where the routine is suspended (exam week, public holidays, etc.)
+    suspendedDates: [
+      {
+        date:   { type: Date, required: true },
+        reason: { type: String, default: "Holiday" },
+      },
+    ],
+
+    // ── Extra one-time classes ─────────────────────────────────────────────────
+    // Classes added on a specific date that override or supplement the pattern
+    extraClasses: [
+      {
+        date:        { type: Date, required: true },
+        courseCode:  { type: String, uppercase: true, trim: true },
+        courseName:  { type: String, default: "" },
+        teacherName: { type: String, default: "" },
+        teacherShortForm: { type: String, default: "" },
+        room:        { type: String, default: "" },
+        startTime:   { type: String, required: true },
+        endTime:     { type: String, required: true },
+        type:        { type: String, enum: ["Theory","Lab","Tutorial"], default: "Theory" },
+        note:        { type: String, default: "" },
+      },
+    ],
 
     isActive: { type: Boolean, default: true },
     publishedBy: {
@@ -143,9 +180,7 @@ const routineSchema = new mongoose.Schema(
       ref: "User",
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 routineSchema.index({ dept: 1, level: 1, term: 1, session: 1 }, { unique: true });
